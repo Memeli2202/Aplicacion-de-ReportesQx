@@ -16,6 +16,9 @@ jobs:
           - os: macos-latest
             jpackage-type: dmg
             extra-args: ""
+          - os: macos-15-intel
+            jpackage-type: dmg
+            extra-args: ""
 
     runs-on: ${{ matrix.os }}
 
