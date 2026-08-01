@@ -303,4 +303,9 @@ public class ReportBuilder extends JFrame {
         return panelDeContenido;
     }
 
+    private void createUIComponents() {
+        // TODO: place custom component creation code here
+        botonCrearReporte = new BotonColoreado();
+        botonCancelar = new BotonColoreado();
+    }
 }

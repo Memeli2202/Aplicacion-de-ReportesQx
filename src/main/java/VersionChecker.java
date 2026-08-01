@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
  */
 public class VersionChecker {
     //bump this by hand whenever you tag and publish a new release
-    public static final String CURRENT_VERSION = "1.0.10";
+    public static final String CURRENT_VERSION = "1.0.13";
 
     private static final String REPO = "Memeli2202/Aplicacion-de-ReportesQx";
     private static final String API_URL = "https://api.github.com/repos/" + REPO + "/releases/latest";

@@ -201,6 +201,14 @@ public class DialogoImagenes extends JDialog {
         imageContainer.repaint();
     }
 
+    private void createUIComponents() {
+        // TODO: place custom component creation code here
+        buttonOK = new BotonColoreado();
+        buttonCancel = new BotonColoreado();
+        agregarImagen = new BotonColoreado();
+        cancelarImagen = new BotonColoreado();
+    }
+
     public static class ImagenComentario {
         private final BufferedImage imagen;
         private final String comentario;

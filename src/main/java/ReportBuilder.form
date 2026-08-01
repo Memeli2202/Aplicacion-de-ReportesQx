@@ -158,7 +158,7 @@
           <text value="#ENZIAN(s)"/>
         </properties>
       </component>
-      <component id="aaaae" class="javax.swing.JButton" binding="botonCrearReporte">
+      <component id="aaaae" class="javax.swing.JButton" binding="botonCrearReporte" custom-create="true">
         <constraints>
           <grid row="20" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
         </constraints>
@@ -306,7 +306,7 @@
         </constraints>
         <properties/>
       </component>
-      <component id="a50c" class="javax.swing.JButton" binding="botonCancelar">
+      <component id="a50c" class="javax.swing.JButton" binding="botonCancelar" custom-create="true">
         <constraints>
           <grid row="20" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
         </constraints>

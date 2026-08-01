@@ -34,7 +34,7 @@
             <properties/>
             <border type="none"/>
             <children>
-              <component id="e7465" class="javax.swing.JButton" binding="buttonOK">
+              <component id="e7465" class="javax.swing.JButton" binding="buttonOK" custom-create="true">
                 <constraints>
                   <grid row="0" column="0" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
                 </constraints>
@@ -48,7 +48,7 @@
               </component>
             </children>
           </grid>
-          <component id="5723f" class="javax.swing.JButton" binding="buttonCancel">
+          <component id="5723f" class="javax.swing.JButton" binding="buttonCancel" custom-create="true">
             <constraints>
               <grid row="0" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
             </constraints>
@@ -69,7 +69,7 @@
         <properties/>
         <border type="none"/>
         <children>
-          <component id="553a8" class="javax.swing.JButton" binding="agregarImagen">
+          <component id="553a8" class="javax.swing.JButton" binding="agregarImagen" custom-create="true">
             <constraints>
               <grid row="1" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
             </constraints>
@@ -78,7 +78,7 @@
               <text value="Agregar Imagen(es)"/>
             </properties>
           </component>
-          <component id="3fa3a" class="javax.swing.JButton" binding="cancelarImagen">
+          <component id="3fa3a" class="javax.swing.JButton" binding="cancelarImagen" custom-create="true">
             <constraints>
               <grid row="1" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
             </constraints>
