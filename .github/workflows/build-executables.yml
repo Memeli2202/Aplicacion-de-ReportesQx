@@ -12,7 +12,7 @@ jobs:
         include:
           - os: windows-latest
             jpackage-type: exe
-            extra-args: --win-shortcut --win-menu --win-console
+            extra-args: --win-shortcut --win-menu --win-dir-chooser
           - os: macos-latest
             jpackage-type: dmg
             extra-args: ""
