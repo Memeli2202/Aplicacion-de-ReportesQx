@@ -165,6 +165,7 @@
         <properties>
           <background color="-15171304"/>
           <borderPainted value="false"/>
+          <contentAreaFilled value="false"/>
           <foreground color="-1"/>
           <margin top="0" left="0" bottom="0" right="0"/>
           <text value="Generar Reporte"/>
@@ -314,9 +315,10 @@
           <autoscrolls value="false"/>
           <background color="-9494761"/>
           <borderPainted value="false"/>
+          <contentAreaFilled value="false"/>
           <foreground color="-1"/>
           <hideActionText value="true"/>
-          <opaque value="true"/>
+          <opaque value="false"/>
           <selected value="false"/>
           <text value="Cancelar"/>
         </properties>

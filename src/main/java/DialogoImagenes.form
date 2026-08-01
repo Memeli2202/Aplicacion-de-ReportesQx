@@ -41,7 +41,9 @@
                 <properties>
                   <background color="-15171304"/>
                   <borderPainted value="false"/>
+                  <contentAreaFilled value="false"/>
                   <foreground color="-1"/>
+                  <opaque value="false"/>
                   <selected value="true"/>
                   <text value="Agregar al Reporte"/>
                 </properties>
@@ -55,7 +57,9 @@
             <properties>
               <background color="-11070710"/>
               <borderPainted value="false"/>
+              <contentAreaFilled value="false"/>
               <foreground color="-1"/>
+              <opaque value="false"/>
               <text value="Cancelar"/>
             </properties>
           </component>
@@ -75,6 +79,8 @@
             </constraints>
             <properties>
               <background color="-327681"/>
+              <borderPainted value="false"/>
+              <contentAreaFilled value="false"/>
               <text value="Agregar Imagen(es)"/>
             </properties>
           </component>
@@ -84,6 +90,8 @@
             </constraints>
             <properties>
               <background color="-3748128"/>
+              <borderPainted value="false"/>
+              <contentAreaFilled value="false"/>
               <text value="Eliminar Contenido(s)"/>
             </properties>
           </component>
