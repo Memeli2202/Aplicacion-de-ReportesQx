@@ -40,6 +40,7 @@
                 </constraints>
                 <properties>
                   <background color="-15171304"/>
+                  <borderPainted value="false"/>
                   <foreground color="-1"/>
                   <selected value="true"/>
                   <text value="Agregar al Reporte"/>
@@ -53,6 +54,7 @@
             </constraints>
             <properties>
               <background color="-11070710"/>
+              <borderPainted value="false"/>
               <foreground color="-1"/>
               <text value="Cancelar"/>
             </properties>
