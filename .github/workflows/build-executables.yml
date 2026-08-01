@@ -1,0 +1,56 @@
+name: Build Executables
+ 
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+ 
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            jpackage-type: exe
+          - os: macos-latest
+            jpackage-type: dmg
+ 
+    runs-on: ${{ matrix.os }}
+ 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+ 
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+ 
+      - name: Build fat jar with Maven
+        run: mvn -B package
+ 
+      - name: Prepare a clean jpackage input folder
+        shell: bash
+        run: |
+          mkdir -p jpackage-input
+          cp target/DesktopReportBuilderv2-1.0-SNAPSHOT.jar jpackage-input/
+ 
+      - name: Package as a native app with jpackage
+        shell: bash
+        run: |
+          jpackage \
+            --input jpackage-input \
+            --name DesktopReportBuilder \
+            --main-jar DesktopReportBuilderv2-1.0-SNAPSHOT.jar \
+            --main-class Main \
+            --type ${{ matrix.jpackage-type }} \
+            --app-version 1.0.0 \
+            --dest dist
+ 
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: DesktopReportBuilder-${{ matrix.os }}
+          path: dist/*
+ 
