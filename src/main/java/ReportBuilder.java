@@ -82,6 +82,10 @@ public class ReportBuilder extends JFrame {
 
         //set the frame visible
         setVisible(true);
+
+        //check for new version in background
+        VersionChecker.verificarActualizacion(this);
+
     }
 
     public void setSaveButtonListener(SaveButtonListener listener) {
