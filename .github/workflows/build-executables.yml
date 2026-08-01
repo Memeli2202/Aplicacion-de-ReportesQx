@@ -3,6 +3,7 @@ name: Build Executables
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*']
   workflow_dispatch:
 
 jobs:
@@ -16,9 +17,11 @@ jobs:
           - os: macos-latest
             jpackage-type: dmg
             extra-args: ""
+            suffix: mac-applesilicon
           - os: macos-15-intel
             jpackage-type: dmg
             extra-args: ""
+            suffix: mac-intel
 
     runs-on: ${{ matrix.os }}
 
@@ -31,6 +34,16 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+
+      - name: Determine app version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build fat jar with Maven
         run: mvn -B package
@@ -55,8 +68,36 @@ jobs:
             --runtime-image "$JAVA_HOME" \
             ${{ matrix.extra-args }}
 
+      - name: Rename installer with a unique platform suffix
+        shell: bash
+        run: |
+          for f in dist/*; do
+            ext="${f##*.}"
+            base="${f%.*}"
+            mv "$f" "${base}-${{ matrix.suffix }}.${ext}"
+          done
+
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: DesktopReportBuilder-${{ matrix.os }}
           path: dist/*
+
+ release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+ 
+    steps:
+      - name: Download all built installers
+        uses: actions/download-artifact@v4
+        with:
+          path: installers
+ 
+      - name: Publish GitHub Release with installers attached
+        uses: softprops/action-gh-release@v3
+        with:
+          files: installers/*/*
+          generate_release_notes: true
