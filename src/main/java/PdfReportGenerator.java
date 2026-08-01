@@ -68,7 +68,7 @@ public class PdfReportGenerator {
 
                 bloqueHeader.add(new Paragraph("DRA. MELANIE D. PORTER").simulateBold().setFontSize(11).setMargin(0));
                 bloqueHeader.add(new Paragraph("Clínica Universitaria Unión Médica del Norte").setFontSize(9).setMargin(0));
-                bloqueHeader.add(new Paragraph("Dirección: Av. Juan Pablo Duarte No. 176").setFontSize(9).setMargin(0));
+                bloqueHeader.add(new Paragraph("Dirección: Avenida Juan Pablo Duarte No. 176").setFontSize(9).setMargin(0));
                 bloqueHeader.add(new Paragraph("Torre E 6to Piso • Suite 648").setFontSize(9).setMargin(0));
                 bloqueHeader.add(new Paragraph("Citas por WhatsApp: 809-975-9183 | IG: @dramelanieporter").setFontSize(9).setMargin(0));
                 bloqueHeader.add(new Paragraph("Correo: consultoriodramelanieporter@gmail.com").setFontSize(9).setMargin(0));
