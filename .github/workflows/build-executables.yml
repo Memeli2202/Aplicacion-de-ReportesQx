@@ -47,7 +47,7 @@ jobs:
             --main-jar DesktopReportBuilderv2-1.0-SNAPSHOT.jar \
             --main-class Main \
             --type ${{ matrix.jpackage-type }} \
-            --app-version 1.0.0 \
+            --app-version 1.0.${{ github.run_number }} \
             --dest dist \
             --runtime-image "$JAVA_HOME" \
             ${{ matrix.extra-args }}
