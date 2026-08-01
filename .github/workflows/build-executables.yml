@@ -49,7 +49,7 @@ jobs:
             --type ${{ matrix.jpackage-type }} \
             --app-version 1.0.0 \
             --dest dist \
-            --add-modules ALL-MODULE-PATH \
+            --runtime-image "$JAVA_HOME" \
             ${{ matrix.extra-args }}
 
       - name: Upload installer
