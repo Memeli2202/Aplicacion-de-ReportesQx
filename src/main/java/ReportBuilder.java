@@ -121,32 +121,66 @@ public class ReportBuilder extends JFrame {
         reporte.setPostQx(postCirugia.getText());
 
 
-        try {
-            JFileChooser guardarComo = new JFileChooser();
-            guardarComo.setDialogTitle("Guardar Como");
-            guardarComo.setSelectedFile(new File(nombreArchivo(reporte.getNombre())));
-            int resultado = guardarComo.showSaveDialog(panelDeContenido);
-            if (resultado != JFileChooser.APPROVE_OPTION) {
-                return;
+
+        JFileChooser guardarComo = new JFileChooser();
+        guardarComo.setDialogTitle("Guardar Como");
+        guardarComo.setSelectedFile(new File(nombreArchivo(reporte.getNombre())));
+
+        if (System.getProperty("os.name", "").toLowerCase().contains("mac")) {
+            File volumes = new File("/Volumes");
+            if(volumes.exists()) {
+                guardarComo.setCurrentDirectory(volumes);
             }
-
-            File destino = guardarComo.getSelectedFile();
-            if (!destino.getName().toLowerCase().endsWith(".pdf")) {
-                destino = new File(destino.getParentFile(), destino.getName() + ".pdf");
-            }
-
-            PdfReportGenerator.generar(reporte, imagenesComentarios, destino);
-            if (saveButtonListener != null) {
-                saveButtonListener.onSaveClicked(reporte);
-            }
-
-            JOptionPane.showMessageDialog(panelDeContenido, "Reporte guardado correctamente");
-
-        } catch (Exception e) {
-
-            JOptionPane.showMessageDialog(panelDeContenido, "Error al generar el PDF: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-
         }
+
+        int resultado = guardarComo.showSaveDialog(panelDeContenido);
+        if (resultado == JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        File destino = guardarComo.getSelectedFile();
+        if (!destino.getName().toLowerCase().endsWith(".pdf")) {
+            destino = new File(destino.getParentFile(), destino.getName() + ".pdf");
+        }
+
+        final File destinoArchivo = destino;
+
+        JDialog progreso = DialogoProgreso.mostrar(panelDeContenido, "Generando reporte");
+
+        SwingWorker<Void,Void> worker = new SwingWorker<>(){
+            private Exception error;
+
+            @Override
+            protected Void doInBackground() {
+                try {
+                    PdfReportGenerator.generar(reporte, imagenesComentarios, destinoArchivo);
+                } catch (Exception e){
+                    error = e;
+                }
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                progreso.dispose();
+
+                if(error != null) {
+                    JOptionPane.showMessageDialog(panelDeContenido,"Error al generar el PDF: " + error.getMessage(),"Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                if (saveButtonListener != null) {
+                    saveButtonListener.onSaveClicked(reporte);
+                }
+                JOptionPane.showMessageDialog(panelDeContenido, "Reporte guardado correctamente");
+
+
+            }
+        };
+
+        worker.execute();
+        progreso.setVisible(true);
+
     }
 
     private void cancelarReporte() {

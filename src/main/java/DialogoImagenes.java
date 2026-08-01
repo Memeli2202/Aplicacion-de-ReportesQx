@@ -94,31 +94,64 @@ public class DialogoImagenes extends JDialog {
 
             int result = selector.showOpenDialog(contentPane);
             if (result == JFileChooser.APPROVE_OPTION) {
-                int duplicadas = 0;
-                for (File selectedFile : selector.getSelectedFiles()) {
-                    try {
-                        BufferedImage image = ImageIO.read(selectedFile);
-                        if (image != null) {
 
-                            if (yaExistente(image)) {
-                                duplicadas++;
-                                continue;
+                File[] archivosSeleccionados = selector.getSelectedFiles();
+                JDialog progreso = DialogoProgreso.mostrar(contentPane, "Cargando imágenes...");
+
+                SwingWorker<Void, Void> worker = new SwingWorker<>() {
+                    private final List<BufferedImage> nuevasImagenes = new ArrayList<>();
+
+                    int duplicadas = 0;
+                    private String mensajeError;
+                    private String errorArchivo;
+
+                    @Override
+                    protected Void doInBackground() {
+                        for (File selectedFile : archivosSeleccionados) {
+                            try {
+                                BufferedImage image = ImageIO.read(selectedFile);
+                                if (image == null) {
+                                    continue;
+                                }
+                                boolean duplicada =yaExistente(image) || nuevasImagenes.stream().anyMatch(existente -> sonIguales(existente, image));
+                                if(duplicada){
+                                    duplicadas++;
+                                } else {
+                                    nuevasImagenes.add(image);
+                                }
+
+                            } catch (IOException ex) {
+                                JOptionPane.showMessageDialog(contentPane, ex.getMessage(), "Error loading:" + selectedFile.getName(), JOptionPane.ERROR_MESSAGE);
                             }
-
-                            //append the single image to the master arrayList
-                            imagenes.add(image);
-
-                            //update UI to show thumbnail
-                            addImageToUI(image);
                         }
-                    } catch (IOException ex) {
-                        JOptionPane.showMessageDialog(contentPane, ex.getMessage(), "Error loading:" + selectedFile.getName(), JOptionPane.ERROR_MESSAGE);
+                        return null;
                     }
-                }
-                if (duplicadas > 0) {
-                    JOptionPane.showMessageDialog(contentPane, duplicadas + " imagen(es) se encontraban ya en el reporte y fueron omitidas",
-                            "Imagen Duplicada", JOptionPane.ERROR_MESSAGE);
-                }
+
+                    @Override
+                    protected void done() {
+                        progreso.dispose();
+
+                        for (BufferedImage imagen : nuevasImagenes) {
+                            imagenes.add(imagen);
+                            addImageToUI(imagen);
+                        }
+
+                        if(mensajeError != null){
+                            JOptionPane.showMessageDialog(contentPane, mensajeError, "Error cargando: " + errorArchivo , JOptionPane.ERROR_MESSAGE);
+                        }
+
+                        if (duplicadas > 0) {
+                            JOptionPane.showMessageDialog(contentPane, duplicadas + " imagen(es) se encontraban ya en el reporte y fueron omitidas",
+                                    "Imagen Duplicada", JOptionPane.ERROR_MESSAGE);
+                        }
+
+                    }
+                };
+
+                worker.execute();
+                progreso.setVisible(true);
+
+
             }
         });
 
