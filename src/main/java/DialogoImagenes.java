@@ -84,6 +84,14 @@ public class DialogoImagenes extends JDialog {
             selector.setFileFilter(filter);
             selector.setMultiSelectionEnabled(true);
 
+            //added visibility to external drives on macOS
+            if(System.getProperty("os.name").toLowerCase().contains("mac")){
+                File volumes = new File("/Volumes");
+                if(volumes.exists()){
+                    selector.setCurrentDirectory(volumes);
+                }
+            }
+
             int result = selector.showOpenDialog(contentPane);
             if (result == JFileChooser.APPROVE_OPTION) {
                 int duplicadas = 0;
