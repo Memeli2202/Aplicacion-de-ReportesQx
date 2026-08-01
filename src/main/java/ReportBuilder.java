@@ -116,7 +116,6 @@ public class ReportBuilder extends JFrame {
         reporte.setEnzianB2(enzianB2.getText());
         reporte.setEnzianC(enzianC.getText());
         reporte.setEnzianF(enzianF.getText());
-        //reporte.setEnzianF2(enzianF2.getText());
         reporte.setResumenQx(resumenQx.getText());
         reporte.setPostQx(postCirugia.getText());
 
@@ -134,7 +133,7 @@ public class ReportBuilder extends JFrame {
         }
 
         int resultado = guardarComo.showSaveDialog(panelDeContenido);
-        if (resultado == JFileChooser.APPROVE_OPTION) {
+        if (resultado != JFileChooser.APPROVE_OPTION) {
             return;
         }
 
