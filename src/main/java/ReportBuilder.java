@@ -3,9 +3,12 @@ import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
 
 import javax.swing.*;
+import javax.swing.text.JTextComponent;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +37,7 @@ public class ReportBuilder extends JFrame {
     private JTextField enzianT2;
     private JTextField enzianB2;
     private JTextField edadPaciente;
-    //private JTextField enzianF2;
+    private JButton botonNuevoReporte;
 
     private Reporte reporte;
     private SaveButtonListener saveButtonListener;
@@ -75,8 +78,6 @@ public class ReportBuilder extends JFrame {
                 DialogoImagenes dialogoImagenes = new DialogoImagenes(imagenesComentarios);
                 dialogoImagenes.setVisible(true);
 
-                //List<DialogoImagenes.ImagenComentario> seleccion = dialogoImagenes.getResultado();
-
                 if (dialogoImagenes.isAceptado()) {
                     imagenesComentarios = dialogoImagenes.getResultado();
                     JOptionPane.showMessageDialog(panelDeContenido, imagenesComentarios.size() + " imagen(es) en el reporte");
@@ -85,8 +86,22 @@ public class ReportBuilder extends JFrame {
             }
         });
 
+        //crearNuevoReporte action listener
+        botonNuevoReporte.addActionListener(e -> nuevoReporte());
+
         //set the frame visible
         setVisible(true);
+
+        //prevents the text being highlighted when switching back to the app
+        addWindowFocusListener(new WindowAdapter() {
+            @Override
+            public void windowGainedFocus(WindowEvent e) {
+                Component enfocado = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+                if (enfocado instanceof JTextComponent campo) {
+                    campo.setCaretPosition(campo.getCaretPosition());
+                }
+            }
+        });
 
         //check for new version in background
         VersionChecker.verificarActualizacion(this);
@@ -125,9 +140,9 @@ public class ReportBuilder extends JFrame {
         guardarComo.setSelectedFile(new File(nombreArchivo(reporte.getNombre())));
 
         if (System.getProperty("os.name", "").toLowerCase().contains("mac")) {
-            File volumes = new File("/Volumes");
-            if (volumes.exists()) {
-                guardarComo.setCurrentDirectory(volumes);
+            File escritorio = new File(System.getProperty("user.home"), "Desktop");
+            if (escritorio.exists()) {
+                guardarComo.setCurrentDirectory(escritorio);
             }
         }
 
@@ -170,8 +185,18 @@ public class ReportBuilder extends JFrame {
                 if (saveButtonListener != null) {
                     saveButtonListener.onSaveClicked(reporte);
                 }
-                JOptionPane.showMessageDialog(panelDeContenido, "Reporte guardado correctamente");
 
+                Object[] opciones = {"Abrir", "Cerrar"};
+                int opcion = JOptionPane.showOptionDialog(panelDeContenido, "Reporte guardado correctamente.", "Reporte Generado",
+                        JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE, null, opciones, opciones[0]);
+
+                if (opcion == 0) {
+                    try {
+                        Desktop.getDesktop().open(destinoArchivo);
+                    } catch (Exception e) {
+                        JOptionPane.showMessageDialog(panelDeContenido, "No se pudo abrir el archivo: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
 
             }
         };
@@ -182,6 +207,39 @@ public class ReportBuilder extends JFrame {
     }
 
     private void cancelarReporte() {
+
+    }
+
+    private void nuevoReporte() {
+        int confirmacion = JOptionPane.showConfirmDialog(panelDeContenido,
+                "¿Desea crear un nuevo reporte? Se perderán los datos sin guardar.",
+                "Nuevo Reporte", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+
+        if (confirmacion != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        fecha.setText("");
+        nombreProcedimiento.setText("");
+        nombrePaciente.setText("");
+        edadPaciente.setText("");
+        cedula.setText("");
+        ars.setText("");
+        enzianP.setText("");
+        enzianO.setText("");
+        enzianO2.setText("");
+        enzianT.setText("");
+        enzianT2.setText("");
+        enzianA.setText("");
+        enzianB.setText("");
+        enzianB2.setText("");
+        enzianC.setText("");
+        enzianF.setText("");
+        resumenQx.setText("");
+        postCirugia.setText("");
+
+        reporte = new Reporte();
+        imagenesComentarios = new ArrayList<>();
 
     }
 
@@ -327,6 +385,11 @@ public class ReportBuilder extends JFrame {
         panelDeContenido.add(label16, new GridConstraints(2, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         edadPaciente = new JTextField();
         panelDeContenido.add(edadPaciente, new GridConstraints(2, 2, 1, 2, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(150, -1), null, 0, false));
+        botonNuevoReporte.setBackground(new Color(-16732991));
+        botonNuevoReporte.setBorderPainted(false);
+        botonNuevoReporte.setContentAreaFilled(false);
+        botonNuevoReporte.setText("Nuevo Reporte");
+        panelDeContenido.add(botonNuevoReporte, new GridConstraints(20, 2, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
     }
 
     /**
@@ -337,8 +400,8 @@ public class ReportBuilder extends JFrame {
     }
 
     private void createUIComponents() {
-        // TODO: place custom component creation code here
         botonCrearReporte = new BotonColoreado();
         botonCancelar = new BotonColoreado();
+        botonNuevoReporte = new BotonColoreado();
     }
 }

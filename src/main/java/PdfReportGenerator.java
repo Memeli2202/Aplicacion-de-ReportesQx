@@ -22,6 +22,7 @@ import com.itextpdf.layout.properties.UnitValue;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.awt.image.RescaleOp;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -68,10 +69,10 @@ public class PdfReportGenerator {
 
                 bloqueHeader.add(new Paragraph("DRA. MELANIE D. PORTER").simulateBold().setFontSize(11).setMargin(0));
                 bloqueHeader.add(new Paragraph("Clínica Universitaria Unión Médica del Norte").setFontSize(9).setMargin(0));
-                bloqueHeader.add(new Paragraph("Dirección: Avenida Juan Pablo Duarte No. 176").setFontSize(9).setMargin(0));
-                bloqueHeader.add(new Paragraph("Torre E 6to Piso • Suite 648").setFontSize(9).setMargin(0));
+                bloqueHeader.add(new Paragraph("Avenida Juan Pablo Duarte No. 176").setFontSize(9).setMargin(0));
+                bloqueHeader.add(new Paragraph("Torre E 6to Piso • Suite 648").setFontSize(9).setMargin(0).simulateBold());
                 bloqueHeader.add(new Paragraph("Citas por WhatsApp: 809-975-9183 | IG: @dramelanieporter").setFontSize(9).setMargin(0));
-                bloqueHeader.add(new Paragraph("Correo: consultoriodramelanieporter@gmail.com").setFontSize(9).setMargin(0));
+                bloqueHeader.add(new Paragraph("E-mail: consultoriodramelanieporter@gmail.com").setFontSize(9).setMargin(0));
                 documentoFinal.add(bloqueHeader);
 
             }
@@ -79,7 +80,7 @@ public class PdfReportGenerator {
 
             String procedimiento = safe(reporte.getProcedimiento());
             String titulo = procedimiento.isBlank() ? "Reporte Quirúrgico" : procedimiento;
-            documentoFinal.add(new Paragraph(titulo).simulateBold().setFontSize(14));
+            documentoFinal.add(new Paragraph(titulo).simulateBold().setFontSize(14).setTextAlignment(TextAlignment.CENTER));
             documentoFinal.add(separador());
 
             documentoFinal.add(new Paragraph("Nombre: " + safe(reporte.getNombre())).simulateBold().setFontSize(12).setMarginBottom(2));
@@ -308,6 +309,10 @@ public class PdfReportGenerator {
         Graphics2D g2d = copia.createGraphics();
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2d.drawImage(original, 0, 0, null);
+
+        //brighten up the image
+        RescaleOp brillo = new RescaleOp(1.10f, 12f, null);
+        g2d.drawImage(original, brillo, 0, 0);
 
         String texto = String.valueOf(numero);
         int margen = 10;
