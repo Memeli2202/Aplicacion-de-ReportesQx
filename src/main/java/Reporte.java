@@ -88,10 +88,6 @@ public class Reporte {
     public void setEnzianC(String enzianC) {this.enzianC = enzianC;}
     public String getEnzianF() {return enzianF;}
     public void setEnzianF(String enzianF) {this.enzianF = enzianF;}
-    //public String getEnzianF2() {return enzianF2;}
-    /*public void setEnzianF2(String enzianF2) {
-        this.enzianF2 = enzianF2;
-    }*/
 
     public String getResumenQx() {return resumenQx;}
     public void setResumenQx(String resumenQx) {this.resumenQx = resumenQx;}

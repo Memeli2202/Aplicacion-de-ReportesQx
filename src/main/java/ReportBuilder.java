@@ -96,10 +96,13 @@ public class ReportBuilder extends JFrame {
         addWindowFocusListener(new WindowAdapter() {
             @Override
             public void windowGainedFocus(WindowEvent e) {
-                Component enfocado = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
-                if (enfocado instanceof JTextComponent campo) {
-                    campo.setCaretPosition(campo.getCaretPosition());
-                }
+                SwingUtilities.invokeLater(() -> {
+
+                    Component enfocado = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+                    if (enfocado instanceof JTextComponent campo) {
+                        campo.setCaretPosition(campo.getCaretPosition());
+                    }
+                });
             }
         });
 

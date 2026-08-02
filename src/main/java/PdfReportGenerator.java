@@ -61,7 +61,6 @@ public class PdfReportGenerator {
 
                 float xTexto = LOGO_ANCHO + LOGO_OFFSET + 30;
                 float anchoTexto = 280f;
-                //float alturaTextoAprox = 55f;
                 float yTexto = (PageSize.LETTER.getHeight() - LOGO_OFFSET) - HEADER_ALTO_APROX - 10;
 
                 Div bloqueHeader = new Div();
@@ -351,7 +350,7 @@ public class PdfReportGenerator {
     private static String combinar(String principal, String secundario){
         String p = safe(principal);
         String s = safe(secundario);
-        return s.isBlank() ? p : s + "/" + p;
+        return s.isBlank() ? p : p + "/" + s;
     }
 
     private static Cell etiqueta(String texto){
