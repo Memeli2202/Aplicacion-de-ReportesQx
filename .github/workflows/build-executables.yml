@@ -14,6 +14,7 @@ jobs:
           - os: windows-latest
             jpackage-type: exe
             extra-args: --win-shortcut --win-menu --win-dir-chooser
+            suffix: windows
           - os: macos-latest
             jpackage-type: dmg
             extra-args: ""
@@ -63,9 +64,9 @@ jobs:
             --main-jar DesktopReportBuilderv2-1.0-SNAPSHOT.jar \
             --main-class Main \
             --type ${{ matrix.jpackage-type }} \
-            --app-version 1.0.${{ github.run_number }} \
+            --app-version ${{ steps.version.outputs.version }} \
             --dest dist \
-            --runtime-image "$JAVA_HOME" \
+            --add-modules java.desktop,java.xml,java.logging,java.naming,java.net.http,java.management,java.security.jgss,java.instrument,jdk.crypto.ec,jdk.crypto.cryptoki,jdk.unsupported,jdk.charsets \
             ${{ matrix.extra-args }}
 
       - name: Rename installer with a unique platform suffix
