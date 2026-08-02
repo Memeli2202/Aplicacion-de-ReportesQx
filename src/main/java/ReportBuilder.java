@@ -147,6 +147,17 @@ public class ReportBuilder extends JFrame {
             if (escritorio.exists()) {
                 guardarComo.setCurrentDirectory(escritorio);
             }
+
+            File volumes = new File("/Volumes");
+            if (volumes.exists()) {
+                JPanel accesorio = new JPanel();
+                accesorio.setLayout(new BoxLayout(accesorio, BoxLayout.Y_AXIS));
+                accesorio.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                JButton irAUnidades = new JButton("Unidades Externas");
+                irAUnidades.addActionListener(ev -> guardarComo.setCurrentDirectory(volumes));
+                accesorio.add(irAUnidades);
+                guardarComo.setAccessory(accesorio);
+            }
         }
 
         int resultado = guardarComo.showSaveDialog(panelDeContenido);

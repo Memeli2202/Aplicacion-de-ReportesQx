@@ -86,9 +86,20 @@ public class DialogoImagenes extends JDialog {
 
             //added visibility to external drives on macOS
             if (System.getProperty("os.name").toLowerCase().contains("mac")) {
+                File escritorio = new File(System.getProperty("user.home"), "Desktop");
+                if (escritorio.exists()) {
+                    selector.setCurrentDirectory(escritorio);
+                }
+
                 File volumes = new File("/Volumes");
                 if (volumes.exists()) {
-                    selector.setCurrentDirectory(volumes);
+                    JPanel accesorio = new JPanel();
+                    accesorio.setLayout(new BoxLayout(accesorio, BoxLayout.Y_AXIS));
+                    accesorio.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                    JButton irAUnidades = new JButton("Memorias Externas");
+                    irAUnidades.addActionListener(ev -> selector.setCurrentDirectory(volumes));
+                    accesorio.add(irAUnidades);
+                    selector.setAccessory(accesorio);
                 }
             }
 
