@@ -80,11 +80,11 @@ public class PdfReportGenerator {
 
             String procedimiento = safe(reporte.getProcedimiento());
             String titulo = procedimiento.isBlank() ? "Reporte Quirúrgico" : procedimiento;
-            documentoFinal.add(new Paragraph(titulo).simulateBold().setFontSize(14).setTextAlignment(TextAlignment.CENTER));
-            documentoFinal.add(separador());
 
-            documentoFinal.add(new Paragraph("Nombre: " + safe(reporte.getNombre())).simulateBold().setFontSize(12).setMarginBottom(2));
-            //documentoFinal.add(new Paragraph(" "));
+            Div seccionInfo = new Div().setKeepTogether(true);
+            seccionInfo.add(new Paragraph(titulo).simulateBold().setFontSize(14).setTextAlignment(TextAlignment.CENTER));
+            seccionInfo.add(separador());
+            seccionInfo.add(new Paragraph("Nombre: " + safe(reporte.getNombre())).simulateBold().setFontSize(12).setMarginBottom(2));
 
             Table datos = new Table(UnitValue.createPercentArray(new float[]{1,4,1,4})).useAllAvailableWidth();
             datos.addCell(etiquetaCompacta("Edad:").simulateBold());
@@ -95,10 +95,10 @@ public class PdfReportGenerator {
             datos.addCell(celdaCompacta(safe(reporte.getArs())));
             datos.addCell(etiquetaCompacta("Fecha:").simulateBold());
             datos.addCell(celdaCompacta(safe(reporte.getFecha())));
-            documentoFinal.add(datos);
-            documentoFinal.add(new Div().setHeight(6));
-            //documentoFinal.add(new Paragraph(" "));
-            documentoFinal.add(separador());
+            seccionInfo.add(datos);
+            seccionInfo.add(new Div().setHeight(6));
+            seccionInfo.add(separador());
+            documentoFinal.add(seccionInfo);
 
             //adding images
             if(imagenes != null && !imagenes.isEmpty()) {
@@ -143,10 +143,12 @@ public class PdfReportGenerator {
             }
 
             if(!safe(reporte.getResumenQx()).isBlank()) {
-                documentoFinal.add(new Paragraph("Comentarios del Procedimiento:").setFontSize(14).simulateBold());
-                documentoFinal.add(new Paragraph(safe(reporte.getResumenQx())).setTextAlignment(TextAlignment.JUSTIFIED).setFontSize(12));
-                documentoFinal.add(new Paragraph(" "));
-                documentoFinal.add(separador());
+                Div seccionResumen = new Div().setKeepTogether(true);
+                seccionResumen.add(new Paragraph("Comentarios del Procedimiento:").setFontSize(14).simulateBold());
+                seccionResumen.add(new Paragraph(safe(reporte.getResumenQx())).setTextAlignment(TextAlignment.JUSTIFIED).setFontSize(12));
+                seccionResumen.add(new Paragraph(" "));
+                seccionResumen.add(separador());
+                documentoFinal.add(seccionResumen);
             }
 
 
@@ -157,7 +159,8 @@ public class PdfReportGenerator {
                     || !safe(reporte.getEnzianT()).isBlank() || !safe(reporte.getEnzianT2()).isBlank();
             if(hayEnzians ) {
                 //Enzian classification
-                documentoFinal.add(new Paragraph("Clasificación #enzian(s):").setFontSize(14).simulateBold());
+                Div seccionEnzian = new Div().setKeepTogether(true);
+                seccionEnzian.add(new Paragraph("Clasificación #enzian(s):").setFontSize(14).simulateBold());
                 Table enzian = new Table(UnitValue.createPercentArray(new float[]{1, 1, 1, 1, 1, 1, 1}))
                         .useAllAvailableWidth();
                 for (String columna : new String[]{"P", "O", "T", "A", "B", "C", "F"}) {
@@ -170,16 +173,19 @@ public class PdfReportGenerator {
                 enzian.addCell(celda(combinar(reporte.getEnzianB(), reporte.getEnzianB2())));
                 enzian.addCell(celda(safe(reporte.getEnzianC())));
                 enzian.addCell(celda(safe(reporte.getEnzianF())));
-                documentoFinal.add(enzian);
-                documentoFinal.add(new Paragraph(" "));
-                documentoFinal.add(separador());
+                seccionEnzian.add(enzian);
+                seccionEnzian.add(new Paragraph(" "));
+                seccionEnzian.add(separador());
+                documentoFinal.add(seccionEnzian);
             }
 
 
             if(!safe(reporte.getPostQx()).isBlank()) {
-                documentoFinal.add(new Paragraph("Que esperar luego de mi Procedimiento:").setFontSize(14).simulateBold());
-                documentoFinal.add(new Paragraph(safe(reporte.getPostQx())).setTextAlignment(TextAlignment.JUSTIFIED).setFontSize(12));
-                documentoFinal.add(new Paragraph(" "));
+                Div seccionPost = new Div().setKeepTogether(true);
+                seccionPost.add(new Paragraph("Que esperar luego de mi Procedimiento:").setFontSize(14).simulateBold());
+                seccionPost.add(new Paragraph(safe(reporte.getPostQx())).setTextAlignment(TextAlignment.JUSTIFIED).setFontSize(12));
+                seccionPost.add(new Paragraph(" "));
+                documentoFinal.add(seccionPost);
             }
 
             //adding sello after everything else is generated
