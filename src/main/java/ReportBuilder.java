@@ -120,14 +120,13 @@ public class ReportBuilder extends JFrame {
         reporte.setPostQx(postCirugia.getText());
 
 
-
         JFileChooser guardarComo = new JFileChooser();
         guardarComo.setDialogTitle("Guardar Como");
         guardarComo.setSelectedFile(new File(nombreArchivo(reporte.getNombre())));
 
         if (System.getProperty("os.name", "").toLowerCase().contains("mac")) {
             File volumes = new File("/Volumes");
-            if(volumes.exists()) {
+            if (volumes.exists()) {
                 guardarComo.setCurrentDirectory(volumes);
             }
         }
@@ -146,14 +145,14 @@ public class ReportBuilder extends JFrame {
 
         JDialog progreso = DialogoProgreso.mostrar(panelDeContenido, "Generando reporte");
 
-        SwingWorker<Void,Void> worker = new SwingWorker<>(){
+        SwingWorker<Void, Void> worker = new SwingWorker<>() {
             private Exception error;
 
             @Override
             protected Void doInBackground() {
                 try {
                     PdfReportGenerator.generar(reporte, imagenesComentarios, destinoArchivo);
-                } catch (Exception e){
+                } catch (Exception e) {
                     error = e;
                 }
                 return null;
@@ -163,8 +162,8 @@ public class ReportBuilder extends JFrame {
             protected void done() {
                 progreso.dispose();
 
-                if(error != null) {
-                    JOptionPane.showMessageDialog(panelDeContenido,"Error al generar el PDF: " + error.getMessage(),"Error", JOptionPane.ERROR_MESSAGE);
+                if (error != null) {
+                    JOptionPane.showMessageDialog(panelDeContenido, "Error al generar el PDF: " + error.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                     return;
                 }
 

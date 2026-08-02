@@ -85,9 +85,9 @@ public class DialogoImagenes extends JDialog {
             selector.setMultiSelectionEnabled(true);
 
             //added visibility to external drives on macOS
-            if(System.getProperty("os.name").toLowerCase().contains("mac")){
+            if (System.getProperty("os.name").toLowerCase().contains("mac")) {
                 File volumes = new File("/Volumes");
-                if(volumes.exists()){
+                if (volumes.exists()) {
                     selector.setCurrentDirectory(volumes);
                 }
             }
@@ -113,8 +113,8 @@ public class DialogoImagenes extends JDialog {
                                 if (image == null) {
                                     continue;
                                 }
-                                boolean duplicada =yaExistente(image) || nuevasImagenes.stream().anyMatch(existente -> sonIguales(existente, image));
-                                if(duplicada){
+                                boolean duplicada = yaExistente(image) || nuevasImagenes.stream().anyMatch(existente -> sonIguales(existente, image));
+                                if (duplicada) {
                                     duplicadas++;
                                 } else {
                                     nuevasImagenes.add(image);
@@ -136,8 +136,8 @@ public class DialogoImagenes extends JDialog {
                             addImageToUI(imagen);
                         }
 
-                        if(mensajeError != null){
-                            JOptionPane.showMessageDialog(contentPane, mensajeError, "Error cargando: " + errorArchivo , JOptionPane.ERROR_MESSAGE);
+                        if (mensajeError != null) {
+                            JOptionPane.showMessageDialog(contentPane, mensajeError, "Error cargando: " + errorArchivo, JOptionPane.ERROR_MESSAGE);
                         }
 
                         if (duplicadas > 0) {

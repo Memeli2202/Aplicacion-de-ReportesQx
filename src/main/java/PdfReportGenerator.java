@@ -78,24 +78,25 @@ public class PdfReportGenerator {
 
 
             String procedimiento = safe(reporte.getProcedimiento());
-            String titulo = procedimiento.isBlank() ? "Reporte Quirúrgico" : "Reporte " + procedimiento;
+            String titulo = procedimiento.isBlank() ? "Reporte Quirúrgico" : procedimiento;
             documentoFinal.add(new Paragraph(titulo).simulateBold().setFontSize(14));
             documentoFinal.add(separador());
 
-            documentoFinal.add(new Paragraph("Nombre: " + safe(reporte.getNombre())).simulateBold().setFontSize(12));
-            documentoFinal.add(new Paragraph(" "));
+            documentoFinal.add(new Paragraph("Nombre: " + safe(reporte.getNombre())).simulateBold().setFontSize(12).setMarginBottom(2));
+            //documentoFinal.add(new Paragraph(" "));
 
-            Table datos = new Table(UnitValue.createPercentArray(new float[]{1,2,1,2})).useAllAvailableWidth();
-            datos.addCell(etiqueta("Edad:").simulateBold());
-            datos.addCell(celda(safe(reporte.getEdad())));
-            datos.addCell(etiqueta("Cédula:").simulateBold());
-            datos.addCell(celda(safe(reporte.getCedula())));
-            datos.addCell(etiqueta("ARS:").simulateBold());
-            datos.addCell(celda(safe(reporte.getArs())));
-            datos.addCell(etiqueta("Fecha:").simulateBold());
-            datos.addCell(celda(safe(reporte.getFecha())));
+            Table datos = new Table(UnitValue.createPercentArray(new float[]{1,4,1,4})).useAllAvailableWidth();
+            datos.addCell(etiquetaCompacta("Edad:").simulateBold());
+            datos.addCell(celdaCompacta(safe(reporte.getEdad())));
+            datos.addCell(etiquetaCompacta("Cédula:").simulateBold());
+            datos.addCell(celdaCompacta(safe(reporte.getCedula())));
+            datos.addCell(etiquetaCompacta("ARS:").simulateBold());
+            datos.addCell(celdaCompacta(safe(reporte.getArs())));
+            datos.addCell(etiquetaCompacta("Fecha:").simulateBold());
+            datos.addCell(celdaCompacta(safe(reporte.getFecha())));
             documentoFinal.add(datos);
-            documentoFinal.add(new Paragraph(" "));
+            documentoFinal.add(new Div().setHeight(6));
+            //documentoFinal.add(new Paragraph(" "));
             documentoFinal.add(separador());
 
             //adding images
@@ -117,52 +118,68 @@ public class PdfReportGenerator {
                 documentoFinal.add(new Paragraph(" "));
                 documentoFinal.add(separador());
 
-                //comments for images
-                documentoFinal.add(new Paragraph("Comentarios de las Imágenes: ").simulateBold().setFontSize(14));
-                numero = 1;
-                for(DialogoImagenes.ImagenComentario imagenYComentario : imagenes) {
-                    String comentario = imagenYComentario.getComentario();
-                    if(comentario == null || comentario.trim().isEmpty()) {
+                //comments for images if there are any
+                boolean hayComentarios = imagenes.stream().anyMatch(imagenComentario ->
+                        imagenComentario.getComentario() != null && !imagenComentario.getComentario().trim().isEmpty());
+
+                if(hayComentarios) {
+                    documentoFinal.add(new Paragraph("Comentarios de las Imágenes: ").simulateBold().setFontSize(14));
+                    numero = 1;
+                    for (DialogoImagenes.ImagenComentario imagenYComentario : imagenes) {
+                        String comentario = imagenYComentario.getComentario();
+                        if (comentario == null || comentario.trim().isEmpty()) {
+                            numero++;
+                            continue;
+                        }
+                        documentoFinal.add(new Paragraph("Imagen " + numero + ". ").simulateBold().setFontSize(12));
+                        documentoFinal.add(new Paragraph(comentario).setTextAlignment(TextAlignment.JUSTIFIED).setFontSize(11));
                         numero++;
-                        continue;
                     }
-                    documentoFinal.add(new Paragraph("Imagen "+ numero + ". ").simulateBold().setFontSize(12));
-                    documentoFinal.add(new Paragraph(comentario).setTextAlignment(TextAlignment.JUSTIFIED).setFontSize(11));
-                    numero++;
+                    documentoFinal.add(new Paragraph(" "));
+                    documentoFinal.add(separador());
                 }
+
+            }
+
+            if(!safe(reporte.getResumenQx()).isBlank()) {
+                documentoFinal.add(new Paragraph("Comentarios del Procedimiento:").setFontSize(14).simulateBold());
+                documentoFinal.add(new Paragraph(safe(reporte.getResumenQx())).setTextAlignment(TextAlignment.JUSTIFIED).setFontSize(12));
                 documentoFinal.add(new Paragraph(" "));
                 documentoFinal.add(separador());
-
             }
 
-            documentoFinal.add(new Paragraph("Resumen de la cirugía:").setFontSize(14).simulateBold());
-            documentoFinal.add(new Paragraph(safe(reporte.getResumenQx())).setTextAlignment(TextAlignment.JUSTIFIED).setFontSize(12));
-            documentoFinal.add(new Paragraph(" "));
-            documentoFinal.add(separador());
 
-
-            //Enzian classification
-            documentoFinal.add(new Paragraph("Clasificación #enzian(s):").setFontSize(14).simulateBold());
-            Table enzian = new Table(UnitValue.createPercentArray(new float[]{1, 1, 1, 1, 1, 1, 1}))
-                    .useAllAvailableWidth();
-            for (String columna : new String[]{"P", "O", "T", "A", "B", "C", "F"}) {
-                enzian.addHeaderCell(etiqueta(columna));
+            boolean hayEnzians = !safe(reporte.getEnzianA()).isBlank() || !safe(reporte.getEnzianB()).isBlank()
+                    || !safe(reporte.getEnzianB2()).isBlank() || !safe(reporte.getEnzianC()).isBlank()
+                    || !safe(reporte.getEnzianF()).isBlank() || !safe(reporte.getEnzianO()).isBlank()
+                    || !safe(reporte.getEnzianO2()).isBlank() || !safe(reporte.getEnzianP()).isBlank()
+                    || !safe(reporte.getEnzianT()).isBlank() || !safe(reporte.getEnzianT2()).isBlank();
+            if(hayEnzians ) {
+                //Enzian classification
+                documentoFinal.add(new Paragraph("Clasificación #enzian(s):").setFontSize(14).simulateBold());
+                Table enzian = new Table(UnitValue.createPercentArray(new float[]{1, 1, 1, 1, 1, 1, 1}))
+                        .useAllAvailableWidth();
+                for (String columna : new String[]{"P", "O", "T", "A", "B", "C", "F"}) {
+                    enzian.addHeaderCell(etiqueta(columna));
+                }
+                enzian.addCell(celda(safe(reporte.getEnzianP())));
+                enzian.addCell(celda(combinar(reporte.getEnzianO(), reporte.getEnzianO2())));
+                enzian.addCell(celda(combinar(reporte.getEnzianT(), reporte.getEnzianT2())));
+                enzian.addCell(celda(safe(reporte.getEnzianA())));
+                enzian.addCell(celda(combinar(reporte.getEnzianB(), reporte.getEnzianB2())));
+                enzian.addCell(celda(safe(reporte.getEnzianC())));
+                enzian.addCell(celda(safe(reporte.getEnzianF())));
+                documentoFinal.add(enzian);
+                documentoFinal.add(new Paragraph(" "));
+                documentoFinal.add(separador());
             }
-            enzian.addCell(celda(safe(reporte.getEnzianP())));
-            enzian.addCell(celda(combinar(reporte.getEnzianO(), reporte.getEnzianO2())));
-            enzian.addCell(celda(combinar(reporte.getEnzianT(), reporte.getEnzianT2())));
-            enzian.addCell(celda(safe(reporte.getEnzianA())));
-            enzian.addCell(celda(combinar(reporte.getEnzianB(), reporte.getEnzianB2())));
-            enzian.addCell(celda(safe(reporte.getEnzianC())));
-            enzian.addCell(celda(safe(reporte.getEnzianF())));
-            documentoFinal.add(enzian);
-            documentoFinal.add(new Paragraph(" "));
-            documentoFinal.add(separador());
 
 
-            documentoFinal.add(new Paragraph("Que esperar luego de mi cirugía:").setFontSize(14).simulateBold());
-            documentoFinal.add(new Paragraph(safe(reporte.getPostQx())).setTextAlignment(TextAlignment.JUSTIFIED).setFontSize(12));
-            documentoFinal.add(new Paragraph(" "));
+            if(!safe(reporte.getPostQx()).isBlank()) {
+                documentoFinal.add(new Paragraph("Que esperar luego de mi Procedimiento:").setFontSize(14).simulateBold());
+                documentoFinal.add(new Paragraph(safe(reporte.getPostQx())).setTextAlignment(TextAlignment.JUSTIFIED).setFontSize(12));
+                documentoFinal.add(new Paragraph(" "));
+            }
 
             //adding sello after everything else is generated
             if(sello != null) {
@@ -180,8 +197,6 @@ public class PdfReportGenerator {
                 bloqueTexto.add(new Paragraph("Reproducción Humana Asistida").setFontSize(8).setMargin(0));
                 bloqueTexto.add(new Paragraph("Laparo-Histeroscopía Avanzada").setFontSize(8).setMargin(0));
                 bloqueTexto.add(new Paragraph("Endometriosis Infiltrativa Profunda").setFontSize(8).setMargin(0));
-                //bloqueTexto.add(new Paragraph("Torre E 6to Piso • Suite 648").simulateBold().setFontSize(8).setMargin(0));
-                //bloqueTexto.add(new Paragraph("Exq 140 05 CMD 20044").simulateBold().setFontSize(8).setMargin(0));
                 documentoFinal.add(bloqueTexto);
 
                 float anchoSello = 130f;
@@ -196,13 +211,6 @@ public class PdfReportGenerator {
 
 
             }
-
-
-            /*
-            TODO
-            poner el nombre a la izquierda
-
-             */
 
 
         }
@@ -325,6 +333,10 @@ public class PdfReportGenerator {
         return new Cell().add(new Paragraph(texto)).setBorder(Border.NO_BORDER);
     }
 
+    private static Cell celdaCompacta(String texto){
+        return new Cell().add(new Paragraph(texto).setMargin(0)).setBorder(Border.NO_BORDER).setPadding(1);
+    }
+
     private static String combinar(String principal, String secundario){
         String p = safe(principal);
         String s = safe(secundario);
@@ -333,6 +345,10 @@ public class PdfReportGenerator {
 
     private static Cell etiqueta(String texto){
         return new Cell().add(new Paragraph(texto)).setBorder(Border.NO_BORDER);
+    }
+
+    private static Cell etiquetaCompacta(String texto){
+        return new Cell().add(new Paragraph(texto).setMargin(0)).setBorder(Border.NO_BORDER).setPadding(1);
     }
 
     private static String safe(String texto){
