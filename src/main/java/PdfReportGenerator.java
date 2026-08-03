@@ -316,7 +316,7 @@ public class PdfReportGenerator {
         g2d.drawImage(original, 0, 0, null);
 
         //brighten up the image
-        RescaleOp brillo = new RescaleOp(1.10f, 12f, null);
+        RescaleOp brillo = new RescaleOp(1.05f, 12f, null);
         g2d.drawImage(original, brillo, 0, 0);
 
         String texto = String.valueOf(numero);
