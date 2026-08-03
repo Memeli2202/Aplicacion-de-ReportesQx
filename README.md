@@ -3,7 +3,7 @@ This program is for creating surgical reports with a UI in Spanish.
 **For Mac Users:**
 Please make sure that you are running the correct .dmg file for the type of chip you have.
 If you have an intel chip, download the intel version,
-If you have an Apple Silicon chip, download the mac-latest version.
+If you have an Apple Silicon chip, download the macos-latest version.
 
 After installing the app to your desired folder, you may run into permission difficulties. Follow these steps to grant the application permission:
 
