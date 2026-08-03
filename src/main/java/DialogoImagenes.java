@@ -24,7 +24,6 @@ public class DialogoImagenes extends JDialog {
 
 
     //control panel for buttons
-    //private JPanel controlPanel = new JPanel(new FlowLayout());
     private JButton agregarImagen = new JButton();
     private JButton cancelarImagen = new JButton();
     private JScrollPane scrollPane;
@@ -243,11 +242,19 @@ public class DialogoImagenes extends JDialog {
         imageLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
         imageLabel.setToolTipText("Click para ver en tamaño completo");
         imageLabel.addMouseListener(new MouseAdapter() {
-           @Override
-           public void mouseClicked(MouseEvent e) {
-               mostrarVistaPrevia(image);
-           }
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                mostrarVistaPrevia(image);
+            }
         });
+
+        //caption showing this image's current position and the number on the report
+        JLabel captionLabel = new JLabel("Imagen");
+        captionLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        captionLabel.setFont(captionLabel.getFont().deriveFont(Font.BOLD));
+        JPanel columnaImagen = new JPanel(new BorderLayout());
+        columnaImagen.add(captionLabel, BorderLayout.NORTH);
+        columnaImagen.add(imageLabel, BorderLayout.CENTER);
 
         //comment box to the right
         JTextArea comentario = new JTextArea();
@@ -259,21 +266,57 @@ public class DialogoImagenes extends JDialog {
         comentarioPane.setBorder(BorderFactory.createTitledBorder("Comentarios"));
         comentarios.add(comentario);
 
-        //delete button for just one image
+        // move up/down, delete for just this image
+        JButton subir = new JButton("Subir");
+        JButton bajar = new JButton("Bajar");
         JButton eliminar = new JButton("Eliminar");
-        JPanel eliminarWrapper = new JPanel(new BorderLayout());
-        eliminarWrapper.add(eliminar, BorderLayout.NORTH);
+        JPanel controlesWrapper = new JPanel(new GridLayout(3, 1, 0, 8));
+        //controlesWrapper.setLayout(new BoxLayout(controlesWrapper, BoxLayout.Y_AXIS));
+        controlesWrapper.add(subir);
+        controlesWrapper.add(bajar);
+        controlesWrapper.add(eliminar);
+
+        //keep the buttons in line to the comentarios box
+        JPanel controlesContenedor = new JPanel(new BorderLayout());
+        controlesContenedor.add(controlesWrapper, BorderLayout.NORTH);
 
         //pairing the image to the comment
         JPanel entry = new JPanel(new BorderLayout(10, 0));
-        entry.add(imageLabel, BorderLayout.WEST);
+        entry.add(columnaImagen, BorderLayout.WEST);
         entry.add(comentarioPane, BorderLayout.CENTER);
-        entry.add(eliminarWrapper, BorderLayout.EAST);
+        entry.add(controlesContenedor, BorderLayout.EAST);
         entry.setBorder(BorderFactory.createEmptyBorder(5, 5, 15, 5));
         entry.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         //set max size so the box layout doesn't stretch to fit the scroll pane
         entry.setMaximumSize(new Dimension(Integer.MAX_VALUE, thumbSize + 30));
+
+        //swap image with the one above
+        subir.addActionListener(e -> {
+            int idx = imagenes.indexOf(image);
+            if (idx > 0) {
+                Collections.swap(imagenes, idx, idx - 1);
+                Collections.swap(comentarios, idx, idx - 1);
+                int z = imageContainer.getComponentZOrder(entry);
+                imageContainer.setComponentZOrder(entry, z - 1);
+                imageContainer.revalidate();
+                imageContainer.repaint();
+                actualizarNumerosDeCaption();
+            }
+        });
+
+        bajar.addActionListener(e -> {
+            int idx = imagenes.indexOf(image);
+            if (idx >= 0 && idx < imagenes.size() - 1) {
+                Collections.swap(imagenes, idx, idx + 1);
+                Collections.swap(comentarios, idx, idx + 1);
+                int z = imageContainer.getComponentZOrder(entry);
+                imageContainer.setComponentZOrder(entry, z + 1);
+                imageContainer.revalidate();
+                imageContainer.repaint();
+                actualizarNumerosDeCaption();
+            }
+        });
 
         //remove just this image and comment when clicked
         eliminar.addActionListener(e -> {
@@ -282,13 +325,30 @@ public class DialogoImagenes extends JDialog {
             imageContainer.remove(entry);
             imageContainer.revalidate();
             imageContainer.repaint();
+            actualizarNumerosDeCaption();
         });
+
+        //store the caption label on the row so actualizar numeros de captions can find it
+        entry.putClientProperty("captionLabel", captionLabel);
 
         imageContainer.add(entry);
 
         //refresh dynamically
         imageContainer.revalidate();
         imageContainer.repaint();
+        actualizarNumerosDeCaption();
+    }
+
+    private void actualizarNumerosDeCaption() {
+        Component[] filas = imageContainer.getComponents();
+        for (int i = 0; i < filas.length; i++) {
+            if (filas[i] instanceof JPanel fila) {
+                Object etiqueta = fila.getClientProperty("captionLabel");
+                if (etiqueta instanceof JLabel captionLabel) {
+                    captionLabel.setText("Imagen " + (i + 1));
+                }
+            }
+        }
     }
 
     private void createUIComponents() {
@@ -327,7 +387,6 @@ public class DialogoImagenes extends JDialog {
     }
 
     private void onCancel() {
-        // add your code here if necessary
         aceptado = false;
         dispose();
     }
