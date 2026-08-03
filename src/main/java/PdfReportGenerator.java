@@ -335,6 +335,28 @@ public class PdfReportGenerator {
         return copia;
     }
 
+private static BufferedImage redimensionarSiEsNecesario(BufferedImage original) {
+        int maxLado = 1000;
+        int ancho = original.getWidth();
+        int alto = original.getHeight();
+
+        if (ancho <= maxLado && alto <= maxLado) {
+            return original;
+        }
+
+        double escala = Math.min((double) maxLado / ancho, (double) maxLado / alto);
+int nuevoAncho = (int) Math.round(ancho * escala);
+        int nuevoAlto = (int) Math.round(alto * escala);
+
+        BufferedImage redimensionada = new BufferedImage(nuevoAncho, nuevoAlto, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g2d = redimensionada.createGraphics();
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g2d.drawImage(original, 0, 0, nuevoAncho, nuevoAlto, null);
+        g2d.dispose();
+        return redimensionada;
+    }
+
     private static LineSeparator separador(){
         return new LineSeparator(new SolidLine());
     }
