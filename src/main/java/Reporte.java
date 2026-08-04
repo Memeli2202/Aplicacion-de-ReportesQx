@@ -1,5 +1,6 @@
 public class Reporte {
 
+    private String id;
     private String fecha;
     private String nombre;
     private String edad;
@@ -16,7 +17,7 @@ public class Reporte {
     private String enzianB2;
     private String enzianC;
     private String enzianF;
-    //private String enzianF2;
+
     private String resumenQx;
     private String postQx;
 
@@ -43,6 +44,11 @@ public class Reporte {
     }
 
     public Reporte() {}
+
+    public String getId() {
+        return id;
+    }
+    public void setId(String id) {this.id = id;}
 
     public String getFecha() {
         return fecha;

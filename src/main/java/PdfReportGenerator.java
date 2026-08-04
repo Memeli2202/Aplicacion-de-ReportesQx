@@ -19,7 +19,11 @@ import com.itextpdf.layout.properties.HorizontalAlignment;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.image.RescaleOp;
@@ -27,6 +31,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Iterator;
 import java.util.List;
 
 
@@ -310,13 +315,14 @@ public class PdfReportGenerator {
      * @return the image with the number added
      */
     private static BufferedImage conNumero(BufferedImage original, int numero) {
+        original = redimensionarSiEsNecesario(original);
         BufferedImage copia = new BufferedImage(original.getWidth(), original.getHeight(), BufferedImage.TYPE_INT_RGB);
         Graphics2D g2d = copia.createGraphics();
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2d.drawImage(original, 0, 0, null);
 
         //brighten up the image
-        RescaleOp brillo = new RescaleOp(1.05f, 12f, null);
+        RescaleOp brillo = new RescaleOp(1f, 12f, null);
         g2d.drawImage(original, brillo, 0, 0);
 
         String texto = String.valueOf(numero);
@@ -335,7 +341,7 @@ public class PdfReportGenerator {
         return copia;
     }
 
-private static BufferedImage redimensionarSiEsNecesario(BufferedImage original) {
+    private static BufferedImage redimensionarSiEsNecesario(BufferedImage original) {
         int maxLado = 1000;
         int ancho = original.getWidth();
         int alto = original.getHeight();
@@ -345,7 +351,7 @@ private static BufferedImage redimensionarSiEsNecesario(BufferedImage original) 
         }
 
         double escala = Math.min((double) maxLado / ancho, (double) maxLado / alto);
-int nuevoAncho = (int) Math.round(ancho * escala);
+        int nuevoAncho = (int) Math.round(ancho * escala);
         int nuevoAlto = (int) Math.round(alto * escala);
 
         BufferedImage redimensionada = new BufferedImage(nuevoAncho, nuevoAlto, BufferedImage.TYPE_INT_RGB);
