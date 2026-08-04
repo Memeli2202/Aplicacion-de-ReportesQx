@@ -1,5 +1,7 @@
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseAdapter;
 
 /**
  * A JButton that paints its own colored background directly, instead of
@@ -16,6 +18,21 @@ public class BotonColoreado extends JButton {
         setOpaque(false);
         setFocusPainted(false);
         setBorderPainted(false);
+
+        addMouseListener(new MouseAdapter(){
+            @Override
+            public void mouseEntered(MouseEvent e {
+                get.Model().setRollover(true);
+                repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e(){
+                getModel().setRollover(false);
+                repaint();
+            }
+        });
+        
     }
 
     @Override
