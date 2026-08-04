@@ -1,16 +1,16 @@
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
+import com.itextpdf.io.image.ImageData;
+import com.itextpdf.io.image.ImageDataFactory;
 
 import javax.swing.*;
 import javax.swing.text.JTextComponent;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
+import java.awt.event.*;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -53,9 +53,23 @@ public class ReportBuilder extends JFrame {
 
     private ActivosAppClient.Activos obtenerActivos() throws IOException, InterruptedException {
         if (activosCache == null) {
-            activosCache = ActivosAppClient.cargarActivos(sesion);
+            ImageData logo = cargarImagenDeRecursos("logos de mami/logo.png");
+            ImageData sello = cargarImagenDeRecursos("logos de mami/sello.png");
+            ImageData marcaAgua = cargarImagenDeRecursos("logos de mami/marca_agua.png");
+            activosCache = new ActivosAppClient.Activos(logo, sello, marcaAgua);
         }
         return activosCache;
+    }
+
+    private static ImageData cargarImagenDeRecursos(String ruta) {
+        try (InputStream in = ReportBuilder.class.getResourceAsStream(ruta)) {
+            if (in == null) {
+                return null;
+            }
+            return ImageDataFactory.create(in.readAllBytes());
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     /**
@@ -69,8 +83,22 @@ public class ReportBuilder extends JFrame {
 
         $$$setupUI$$$();
         setTitle("Crear Nuevo Reporte");
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+
+
+        //clicking the X calls cerrarSesion() (which already confirms before discarding unsaved work)
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                cerrarSesion();
+            }
+        });
         setContentPane(panelDeContenido);
+
+        //ESC also calls cerrarSesion()
+        panelDeContenido.registerKeyboardAction(e -> cerrarSesion(),
+                KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+                JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
         pack();
 
         //sets the frame location to the center of the screen

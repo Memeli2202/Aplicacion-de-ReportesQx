@@ -288,16 +288,16 @@ public class PdfReportGenerator {
      * @param ruta where the file is located
      * @return null if the file isn't there, the image if it is
      */
-//    private static ImageData cargarImagenDeRecursos(String ruta){
-//        try(InputStream in = PdfReportGenerator.class.getResourceAsStream(ruta)){
-//            if(in == null){
-//                return null;
-//            }
-//            return ImageDataFactory.create(in.readAllBytes());
-//        } catch (IOException e) {
-//            return null;
-//        }
-//    }
+    private static ImageData cargarImagenDeRecursos(String ruta){
+        try(InputStream in = PdfReportGenerator.class.getResourceAsStream(ruta)){
+            if(in == null){
+                return null;
+            }
+            return ImageDataFactory.create(in.readAllBytes());
+        } catch (IOException e) {
+            return null;
+        }
+    }
 
     /**
      * Returns a copy of the image with a numbered badge in the top left corner
