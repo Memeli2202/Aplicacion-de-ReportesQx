@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
  * check GitHub for newer version
  */
 public class VersionChecker {
-    //bump this by hand whenever you tag and publish a new release
+    //bump this by hand whenever you tag and publish a new release always
     public static final String CURRENT_VERSION = "1.1.1";
 
     private static final String REPO = "Memeli2202/Aplicacion-de-ReportesQx";
