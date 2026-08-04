@@ -21,13 +21,13 @@ public class BotonColoreado extends JButton {
 
         addMouseListener(new MouseAdapter(){
             @Override
-            public void mouseEntered(MouseEvent e {
+            public void mouseEntered(MouseEvent e) {
                 get.Model().setRollover(true);
                 repaint();
             }
 
             @Override
-            public void mouseExited(MouseEvent e(){
+            public void mouseExited(MouseEvent e){
                 getModel().setRollover(false);
                 repaint();
             }
