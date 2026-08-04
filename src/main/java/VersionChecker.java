@@ -23,8 +23,7 @@ public class VersionChecker {
     /**
      * Kicks off a background check; safe to call from the EDT on startup.
      * Does nothing visible if there's no update, no internet, or the
-     * GitHub API is unreachable - an update check should never interrupt
-     * or break normal use of the app.
+     * GitHub API is unreachable
      */
     public static void verificarActualizacion(Component parent) {
         new SwingWorker<String, Void>() {

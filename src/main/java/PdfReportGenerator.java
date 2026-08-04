@@ -37,20 +37,12 @@ import java.util.List;
 
 public class PdfReportGenerator {
 
-    private static final String RUTA_LOGO = "logos de mami/logoDraMelaniePorter.png";
-    private static final String RUTA_SELLO = "logos de mami/firmaDraMelaniePorter.png";
-    private static final String RUTA_MARCA_AGUA = "logos de mami/logoDraMelaniePorter.png";
-
     private static final float LOGO_ANCHO = 200f;
     private static final float LOGO_OFFSET = 35f;
     private static final float HEADER_ALTO_APROX = 66f;
 
-    public static void generar(Reporte reporte,
-                               List<DialogoImagenes.ImagenComentario> imagenes, File destino) throws IOException {
-
-        ImageData logo = cargarImagenDeRecursos(RUTA_LOGO);
-        ImageData sello = cargarImagenDeRecursos(RUTA_SELLO);
-        ImageData marcaAgua = cargarImagenDeRecursos(RUTA_MARCA_AGUA);
+    public static void generar(Reporte reporte, List<DialogoImagenes.ImagenComentario> imagenes, File destino,
+                               ImageData logo, ImageData sello, ImageData marcaAgua) throws IOException {
 
         PdfDocument pdfDoc = new PdfDocument(new PdfWriter(destino.getAbsolutePath()));
         pdfDoc.addEventHandler(PdfDocumentEvent.END_PAGE, new MarcasFijas(logo, marcaAgua));
@@ -296,16 +288,16 @@ public class PdfReportGenerator {
      * @param ruta where the file is located
      * @return null if the file isn't there, the image if it is
      */
-    private static ImageData cargarImagenDeRecursos(String ruta){
-        try(InputStream in = PdfReportGenerator.class.getResourceAsStream(ruta)){
-            if(in == null){
-                return null;
-            }
-            return ImageDataFactory.create(in.readAllBytes());
-        } catch (IOException e) {
-            return null;
-        }
-    }
+//    private static ImageData cargarImagenDeRecursos(String ruta){
+//        try(InputStream in = PdfReportGenerator.class.getResourceAsStream(ruta)){
+//            if(in == null){
+//                return null;
+//            }
+//            return ImageDataFactory.create(in.readAllBytes());
+//        } catch (IOException e) {
+//            return null;
+//        }
+//    }
 
     /**
      * Returns a copy of the image with a numbered badge in the top left corner

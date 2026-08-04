@@ -10,6 +10,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -48,6 +49,14 @@ public class ReportBuilder extends JFrame {
     private List<DialogoImagenes.ImagenComentario> imagenesComentarios = new ArrayList<>();
 
     private final SesionSupabase sesion;
+    private ActivosAppClient.Activos activosCache;
+
+    private ActivosAppClient.Activos obtenerActivos() throws IOException, InterruptedException {
+        if (activosCache == null) {
+            activosCache = ActivosAppClient.cargarActivos(sesion);
+        }
+        return activosCache;
+    }
 
     /**
      * Constructor for the ReportBuilder Form
@@ -166,7 +175,9 @@ public class ReportBuilder extends JFrame {
                 try {
                     File temporal = File.createTempFile("vista_previa_", ".pdf");
                     temporal.deleteOnExit();
-                    PdfReportGenerator.generar(reporte, imagenesComentarios, temporal);
+                    ActivosAppClient.Activos activos = obtenerActivos();
+                    PdfReportGenerator.generar(reporte, imagenesComentarios, temporal,
+                            activos.logo, activos.sello, activos.marcaAgua);
                     return temporal;
                 } catch (Exception e) {
                     error = e;
@@ -269,7 +280,9 @@ public class ReportBuilder extends JFrame {
             @Override
             protected Void doInBackground() {
                 try {
-                    PdfReportGenerator.generar(reporte, imagenesComentarios, destinoArchivo);
+                    ActivosAppClient.Activos activos = obtenerActivos();
+                    PdfReportGenerator.generar(reporte, imagenesComentarios, destinoArchivo,
+                            activos.logo, activos.sello, activos.marcaAgua);
                 } catch (Exception e) {
                     error = e;
                 }
