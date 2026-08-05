@@ -335,6 +335,7 @@
         <properties>
           <background color="-16732991"/>
           <borderPainted value="false"/>
+          <contentAreaFilled value="false"/>
           <hideActionText value="false"/>
           <text value="Agregar Imágenes"/>
         </properties>
