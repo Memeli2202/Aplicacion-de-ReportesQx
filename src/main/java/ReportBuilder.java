@@ -53,10 +53,7 @@ public class ReportBuilder extends JFrame {
 
     private ActivosAppClient.Activos obtenerActivos() throws IOException, InterruptedException {
         if (activosCache == null) {
-            ImageData logo = cargarImagenDeRecursos("logos de mami/logo.png");
-            ImageData sello = cargarImagenDeRecursos("logos de mami/sello.png");
-            ImageData marcaAgua = cargarImagenDeRecursos("logos de mami/marca_agua.png");
-            activosCache = new ActivosAppClient.Activos(logo, sello, marcaAgua);
+            activosCache = ActivosAppClient.cargarActivos(sesion);
         }
         return activosCache;
     }
@@ -90,9 +87,10 @@ public class ReportBuilder extends JFrame {
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                cerrarSesion();
+                salirCompletamente();
             }
         });
+
         setContentPane(panelDeContenido);
 
         //ESC also calls cerrarSesion()
@@ -521,6 +519,18 @@ public class ReportBuilder extends JFrame {
 
     }
 
+    private void salirCompletamente() {
+        int confirmacion = JOptionPane.showConfirmDialog(panelDeContenido, "¿Deseas cerrar sesión y salir? Se perderán los datos no guardados.", "Salir", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+
+        if (confirmacion != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        SupabaseAuthClient.cerrarSesion();
+        dispose();
+        System.exit(0);
+    }
+
     /**
      * Clears all the information that has been filled so that a new report can be created
      */
@@ -595,7 +605,7 @@ public class ReportBuilder extends JFrame {
     private void $$$setupUI$$$() {
         createUIComponents();
         panelDeContenido = new JPanel();
-        panelDeContenido.setLayout(new GridLayoutManager(22, 6, new Insets(10, 0, 0, 0), -1, -1));
+        panelDeContenido.setLayout(new GridLayoutManager(20, 6, new Insets(10, 0, 0, 0), -1, -1));
         panelDeContenido.setMinimumSize(new Dimension(500, 550));
         panelDeContenido.setPreferredSize(new Dimension(600, 700));
         final JLabel label1 = new JLabel();
@@ -619,22 +629,22 @@ public class ReportBuilder extends JFrame {
         fecha = new JTextField();
         panelDeContenido.add(fecha, new GridConstraints(1, 2, 1, 2, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(150, -1), null, 0, false));
         final JScrollPane scrollPane1 = new JScrollPane();
-        panelDeContenido.add(scrollPane1, new GridConstraints(16, 1, 2, 4, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        panelDeContenido.add(scrollPane1, new GridConstraints(16, 1, 1, 4, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
         resumenQx = new JTextPane();
         resumenQx.setMinimumSize(new Dimension(7, 15));
         resumenQx.setText("");
         scrollPane1.setViewportView(resumenQx);
         final JScrollPane scrollPane2 = new JScrollPane();
-        panelDeContenido.add(scrollPane2, new GridConstraints(19, 1, 2, 4, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        panelDeContenido.add(scrollPane2, new GridConstraints(18, 1, 1, 4, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
         postCirugia = new JTextPane();
         postCirugia.setMinimumSize(new Dimension(7, 15));
         scrollPane2.setViewportView(postCirugia);
         final JLabel label5 = new JLabel();
-        label5.setText("Resumen de la cirugía:");
+        label5.setText("Resumen del procedimiento:");
         panelDeContenido.add(label5, new GridConstraints(15, 1, 1, 3, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         final JLabel label6 = new JLabel();
-        label6.setText("Que esperar luego de mi cirugía:");
-        panelDeContenido.add(label6, new GridConstraints(18, 1, 1, 3, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        label6.setText("Que esperar luego de mi procedimiento:");
+        panelDeContenido.add(label6, new GridConstraints(17, 1, 1, 3, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         nombreProcedimiento = new JTextField();
         panelDeContenido.add(nombreProcedimiento, new GridConstraints(6, 2, 1, 2, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(150, -1), null, 0, false));
         final JLabel label7 = new JLabel();
@@ -649,7 +659,7 @@ public class ReportBuilder extends JFrame {
         botonCrearReporte.setForeground(new Color(-1));
         botonCrearReporte.setMargin(new Insets(0, 0, 0, 0));
         botonCrearReporte.setText("Generar Reporte");
-        panelDeContenido.add(botonCrearReporte, new GridConstraints(21, 4, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        panelDeContenido.add(botonCrearReporte, new GridConstraints(19, 4, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         final Spacer spacer1 = new Spacer();
         panelDeContenido.add(spacer1, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, 1, null, null, null, 0, false));
         final Spacer spacer2 = new Spacer();
@@ -698,7 +708,7 @@ public class ReportBuilder extends JFrame {
         botonCancelar.setOpaque(false);
         botonCancelar.setSelected(false);
         botonCancelar.setText("Cancelar");
-        panelDeContenido.add(botonCancelar, new GridConstraints(21, 3, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        panelDeContenido.add(botonCancelar, new GridConstraints(19, 3, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         final Spacer spacer3 = new Spacer();
         panelDeContenido.add(spacer3, new GridConstraints(1, 4, 6, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, 1, null, null, null, 0, false));
         botonAgregarImagenes.setBackground(new Color(-16732991));
@@ -723,6 +733,7 @@ public class ReportBuilder extends JFrame {
         panel1.setLayout(new GridLayoutManager(1, 1, new Insets(0, 0, 0, 0), -1, -1));
         panelDeContenido.add(panel1, new GridConstraints(0, 0, 1, 6, GridConstraints.ANCHOR_NORTH, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, null, null, 0, false));
         mainToolbar = new JToolBar();
+        mainToolbar.setFloatable(false);
         panel1.add(mainToolbar, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(-1, 20), null, 0, false));
         botonReportesGuradados.setBackground(new Color(-16732991));
         botonReportesGuradados.setBorderPainted(false);

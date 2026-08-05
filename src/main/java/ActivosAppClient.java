@@ -17,9 +17,10 @@ import java.time.Duration;
  * signature image out of the public GitHub repo entirely.
  *
  * Uses signed URLs (POST /object/sign/... then GET the result) rather than
- * the direct authenticated object GET - the direct path was returning a
- * DatabaseInvalidObjectDefinition error from Supabase's Storage API on this
- * project, while signed URLs (a different code path) work correctly.
+ * the direct authenticated object GET. This was originally a workaround for
+ * a Supabase-side Storage bug (DatabaseInvalidObjectDefinition errors on
+ * both access paths) that has since resolved itself - kept as-is since it
+ * works reliably and there's no reason to switch back.
  *
  * IMPORTANT before this works:
  * 1. Create a PRIVATE bucket named "activos-app" in Supabase Storage.
@@ -68,12 +69,9 @@ public class ActivosAppClient {
                 .build();
 
         HttpResponse<byte[]> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        System.out.println("[DEBUG] " + nombreArchivo + " descarga -> HTTP " + response.statusCode());
         if (response.statusCode() >= 300) {
-            System.out.println("[DEBUG] " + nombreArchivo + " descarga error body: " + new String(response.body()));
             return null;
         }
-        System.out.println("[DEBUG] " + nombreArchivo + " downloaded, " + response.body().length + " bytes");
         return ImageDataFactory.create(response.body());
     }
 
@@ -88,9 +86,7 @@ public class ActivosAppClient {
                 .build();
 
         HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-        System.out.println("[DEBUG] " + nombreArchivo + " firma -> HTTP " + response.statusCode());
         if (response.statusCode() >= 300) {
-            System.out.println("[DEBUG] " + nombreArchivo + " firma error body: " + response.body());
             return null;
         }
 

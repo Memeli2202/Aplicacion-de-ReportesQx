@@ -5,29 +5,50 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * check GitHub for newer version
+ *
+ * How the actual install happens (a running app can't overwrite its own
+ *  * files, so this can't be fully invisible):
+ *  *   1. Download the installer to a temp file.
+ *  *   2. Write a tiny helper script that waits a couple seconds (giving this
+ *  *      JVM time to fully exit), then runs the installer silently.
+ *  *   3. Launch that helper script as an independent process, then exit.
+ *
  */
 public class VersionChecker {
-    //bump this by hand whenever you tag and publish a new release always
-    public static final String CURRENT_VERSION = "1.1.1";
 
-    private static final String REPO = "Memeli2202/Aplicacion-de-ReportesQx";
+    //bump this by hand whenever you tag and publish a new release
+    public static final String CURRENT_VERSION = "1.1.2";
+
+    private static final String REPO = "Memeli2202/Aplicacion-de-ReportesQx"; // <-- update this
+    private static final String APP_NAME = "DesktopReportBuilder"; // <-- must match jpackage --name
     private static final String API_URL = "https://api.github.com/repos/" + REPO + "/releases/latest";
-    private static final String RELEASES_PAGE = "https://github.com/" + REPO + "/releases/latest";
+
+    private static class Asset {
+        final String nombre;
+        final String url;
+        Asset(String nombre, String url) {
+            this.nombre = nombre;
+            this.url = url;
+        }
+    }
 
     /**
      * Kicks off a background check; safe to call from the EDT on startup.
      * Does nothing visible if there's no update, no internet, or the
-     * GitHub API is unreachable
+     * GitHub API is unreachable - an update check should never interrupt
+     * or break normal use of the app.
      */
     public static void verificarActualizacion(Component parent) {
         new SwingWorker<String, Void>() {
-            private String urlDescarga;
+            private Asset asset;
 
             @Override
             protected String doInBackground() {
@@ -50,8 +71,7 @@ public class VersionChecker {
                     if (ultimaVersion == null || !esMasNueva(ultimaVersion, CURRENT_VERSION)) {
                         return null;
                     }
-                    //pick the one asset matching this user's OS/architecture, if we can find it
-                    urlDescarga = buscarAssetParaEstePlataforma(body);
+                    asset = buscarAssetParaEstePlataforma(body);
                     return ultimaVersion;
                 } catch (Exception ex) {
                     //offline, DNS failure, GitHub down, rate-limited, etc. - fail silently
@@ -63,14 +83,131 @@ public class VersionChecker {
             protected void done() {
                 try {
                     String ultimaVersion = get();
-                    if (ultimaVersion != null) {
-                        mostrarAvisoActualizacion(parent, ultimaVersion, urlDescarga);
+                    if (ultimaVersion != null && asset != null) {
+                        confirmarYDescargar(parent, ultimaVersion, asset);
                     }
                 } catch (Exception ignored) {
                     //never let a failed update check surface as an error to the user
                 }
             }
         }.execute();
+    }
+
+    private static void confirmarYDescargar(Component parent, String nuevaVersion, Asset asset) {
+        int opcion = JOptionPane.showConfirmDialog(parent,
+                "Hay una nueva versión disponible (" + nuevaVersion + ").\n¿Deseas descargarla ahora?",
+                "Actualización disponible",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.INFORMATION_MESSAGE);
+
+        if (opcion != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        JDialog progreso = DialogoProgreso.mostrar(parent, "Descargando actualización...");
+
+        SwingWorker<Path, Void> worker = new SwingWorker<>() {
+            private Exception error;
+
+            @Override
+            protected Path doInBackground() {
+                try {
+                    return descargarArchivo(asset);
+                } catch (Exception e) {
+                    error = e;
+                    return null;
+                }
+            }
+
+            @Override
+            protected void done() {
+                progreso.dispose();
+
+                if (error != null) {
+                    JOptionPane.showMessageDialog(parent, "No se pudo descargar la actualización: " + error.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                try {
+                    Path archivo = get();
+                    int reiniciar = JOptionPane.showConfirmDialog(parent,
+                            "Actualización lista. ¿Reiniciar ahora para instalarla?",
+                            "Actualización lista",
+                            JOptionPane.YES_NO_OPTION,
+                            JOptionPane.INFORMATION_MESSAGE);
+                    if (reiniciar == JOptionPane.YES_OPTION) {
+                        aplicarActualizacion(archivo);
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        };
+
+        worker.execute();
+        progreso.setVisible(true);
+    }
+
+    private static Path descargarArchivo(Asset asset) throws IOException, InterruptedException {
+        Path destino = Files.createTempFile("update_", "_" + asset.nombre);
+        HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(asset.url))
+                .timeout(Duration.ofMinutes(5)) //installers can be sizable
+                .GET()
+                .build();
+        client.send(request, HttpResponse.BodyHandlers.ofFile(destino));
+        return destino;
+    }
+
+    /**
+     * Writes and launches a small helper script that waits for this JVM to
+     * fully exit, then installs the update - a running app can't safely
+     * overwrite its own currently-loaded files, so this indirection is
+     * necessary on both platforms.
+     */
+    private static void aplicarActualizacion(Path archivoDescargado) {
+        try {
+            String osName = System.getProperty("os.name", "").toLowerCase();
+            if (osName.contains("win")) {
+                aplicarActualizacionWindows(archivoDescargado);
+            } else if (osName.contains("mac")) {
+                aplicarActualizacionMac(archivoDescargado);
+            } else {
+                JOptionPane.showMessageDialog(null, "Actualización automática no disponible para este sistema operativo.");
+            }
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(null, "No se pudo iniciar la actualización: " + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private static void aplicarActualizacionWindows(Path instalador) throws IOException {
+        Path script = Files.createTempFile("actualizar_", ".bat");
+        String contenido = "@echo off\r\n"
+                + "timeout /t 2 /nobreak >nul\r\n"
+                + "\"" + instalador.toAbsolutePath() + "\" /quiet\r\n";
+        Files.writeString(script, contenido);
+
+        new ProcessBuilder("cmd", "/c", "start", "", script.toAbsolutePath().toString()).start();
+        System.exit(0);
+    }
+
+    private static void aplicarActualizacionMac(Path dmg) throws IOException {
+        Path script = Files.createTempFile("actualizar_", ".sh");
+        String contenido = "#!/bin/bash\n"
+                + "sleep 2\n"
+                + "MOUNT_DIR=$(hdiutil attach \"" + dmg.toAbsolutePath() + "\" -nobrowse -noautoopen | tail -1 | awk '{print $NF}')\n"
+                + "rm -rf \"/Applications/" + APP_NAME + ".app\"\n"
+                + "cp -R \"$MOUNT_DIR/" + APP_NAME + ".app\" /Applications/\n"
+                + "hdiutil detach \"$MOUNT_DIR\" -quiet\n"
+                + "open \"/Applications/" + APP_NAME + ".app\"\n";
+        Files.writeString(script, contenido);
+        //noinspection ResultOfMethodCallIgnored
+        script.toFile().setExecutable(true);
+
+        new ProcessBuilder("/bin/bash", script.toAbsolutePath().toString()).start();
+        System.exit(0);
     }
 
     private static String extraerTagName(String json) {
@@ -98,7 +235,7 @@ public class VersionChecker {
      * "mac-applesilicon", or "mac-intel" - matching that workflow's
      * platform suffix convention.
      */
-    private static String buscarAssetParaEstePlataforma(String json) {
+    private static Asset buscarAssetParaEstePlataforma(String json) {
         String sufijo = detectarSufijoDePlataforma();
         if (sufijo == null) {
             return null;
@@ -112,7 +249,7 @@ public class VersionChecker {
             String nombreArchivo = m.group(1);
             String url = m.group(2);
             if (nombreArchivo.contains(sufijo)) {
-                return url;
+                return new Asset(nombreArchivo, url);
             }
         }
         return null;
@@ -129,30 +266,6 @@ public class VersionChecker {
             boolean esAppleSilicon = osArch.contains("aarch64") || osArch.contains("arm");
             return esAppleSilicon ? "mac-applesilicon" : "mac-intel";
         }
-        return null; //unrecognized OS (e.g. Linux) - fall back to the releases page
-    }
-
-    private static void mostrarAvisoActualizacion(Component parent, String nuevaVersion, String urlDescarga) {
-        String mensaje = "Hay una nueva versión disponible (" + nuevaVersion + ").\n\n"
-                + "Al aceptar, se abrirá la descarga en tu navegador. Una vez descargado el archivo,\n"
-                + "ábrelo y sigue las instrucciones del instalador.\n\n"
-                + "Nota: como esta aplicación no está registrada con Windows/Apple, es normal que\n"
-                + "aparezca una advertencia de seguridad. Puedes continuar seleccionando\n"
-                + "\"Más información\" > \"Ejecutar de todas formas\" (Windows) o \"Abrir de todas formas\"\n"
-                + "desde Preferencias del Sistema (Mac).";
-
-        int opcion = JOptionPane.showConfirmDialog(parent, mensaje,
-                "Actualización disponible",
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.INFORMATION_MESSAGE);
-
-        if (opcion == JOptionPane.YES_OPTION) {
-            String destino = urlDescarga != null ? urlDescarga : RELEASES_PAGE;
-            try {
-                Desktop.getDesktop().browse(URI.create(destino));
-            } catch (IOException ex) {
-                JOptionPane.showMessageDialog(parent, "No se pudo abrir el navegador: " + ex.getMessage());
-            }
-        }
+        return null; //unrecognized OS (e.g. Linux)
     }
 }

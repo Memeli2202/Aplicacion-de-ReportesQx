@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <form xmlns="http://www.intellij.com/uidesigner/form/" version="1" bind-to-class="ReportBuilder">
-  <grid id="27dc6" binding="panelDeContenido" layout-manager="GridLayoutManager" row-count="22" column-count="6" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
+  <grid id="27dc6" binding="panelDeContenido" layout-manager="GridLayoutManager" row-count="20" column-count="6" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
     <margin top="10" left="0" bottom="0" right="0"/>
     <constraints>
       <xy x="20" y="20" width="658" height="763"/>
@@ -85,7 +85,7 @@
       </component>
       <scrollpane id="387d5">
         <constraints>
-          <grid row="16" column="1" row-span="2" col-span="4" vsize-policy="7" hsize-policy="7" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
+          <grid row="16" column="1" row-span="1" col-span="4" vsize-policy="7" hsize-policy="7" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties/>
         <border type="none"/>
@@ -101,7 +101,7 @@
       </scrollpane>
       <scrollpane id="d62aa">
         <constraints>
-          <grid row="19" column="1" row-span="2" col-span="4" vsize-policy="7" hsize-policy="7" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
+          <grid row="18" column="1" row-span="1" col-span="4" vsize-policy="7" hsize-policy="7" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties/>
         <border type="none"/>
@@ -119,15 +119,15 @@
           <grid row="15" column="1" row-span="1" col-span="3" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
-          <text value="Resumen de la cirugía:"/>
+          <text value="Resumen del procedimiento:"/>
         </properties>
       </component>
       <component id="99e4e" class="javax.swing.JLabel">
         <constraints>
-          <grid row="18" column="1" row-span="1" col-span="3" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
+          <grid row="17" column="1" row-span="1" col-span="3" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
-          <text value="Que esperar luego de mi cirugía:"/>
+          <text value="Que esperar luego de mi procedimiento:"/>
         </properties>
       </component>
       <component id="a3145" class="javax.swing.JTextField" binding="nombreProcedimiento">
@@ -160,7 +160,7 @@
       </component>
       <component id="aaaae" class="javax.swing.JButton" binding="botonCrearReporte" custom-create="true">
         <constraints>
-          <grid row="21" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+          <grid row="19" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
           <background color="-15171304"/>
@@ -309,7 +309,7 @@
       </component>
       <component id="a50c" class="javax.swing.JButton" binding="botonCancelar" custom-create="true">
         <constraints>
-          <grid row="21" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+          <grid row="19" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
           <autoscrolls value="false"/>
@@ -397,7 +397,9 @@
                 <preferred-size width="-1" height="20"/>
               </grid>
             </constraints>
-            <properties/>
+            <properties>
+              <floatable value="false"/>
+            </properties>
             <border type="none"/>
             <children>
               <component id="a23cf" class="javax.swing.JButton" binding="botonReportesGuradados" custom-create="true">
