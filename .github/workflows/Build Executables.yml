@@ -12,7 +12,7 @@ jobs:
         include:
           - os: windows-latest
             jpackage-type: exe
-            extra-args: --win-shortcut --win-menu --win-console --win-dir-chooser
+            extra-args: --win-shortcut --win-menu --win-dir-chooser
             suffix: windows
           - os: macos-latest
             jpackage-type: dmg
@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up JDK 25
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '25'
