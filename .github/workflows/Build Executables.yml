@@ -90,7 +90,7 @@ jobs:
         run: |
           SIGN_ARGS=()
           if [[ "${{ runner.os }}" == "macOS" ]]; then
-            SIGN_ARGS=(--mac-sign --mac-signing-key-user-name "$MACOS_CERTIFICATE_NAME" --mac-signing-keychain build.keychain)
+            SIGN_ARGS=(--mac-sign --mac-signing-key-user-name "$MACOS_CERTIFICATE_NAME" --mac-signing-keychain "$HOME/Library/Keychains/build.keychain-db")
           fi
 
           jpackage \
