@@ -58,6 +58,7 @@ jobs:
           security create-keychain -p actions build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p actions build.keychain
+          security list-keychains -d user -s build.keychain login.keychain
           security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
           rm certificate.p12
@@ -75,7 +76,7 @@ jobs:
         run: |
           SIGN_ARGS=()
           if [[ "${{ runner.os }}" == "macOS" ]]; then
-            SIGN_ARGS=(--mac-sign --mac-signing-key-user-name "$MACOS_CERTIFICATE_NAME")
+            SIGN_ARGS=(--mac-sign --mac-signing-key-user-name "$MACOS_CERTIFICATE_NAME" --mac-signing-keychain build.keychain)
           fi
 
           jpackage \
