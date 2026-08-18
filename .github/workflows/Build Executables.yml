@@ -59,9 +59,13 @@ jobs:
           security default-keychain -s build.keychain
           security unlock-keychain -p actions build.keychain
           security list-keychains -d user -s build.keychain login.keychain
+
+          curl -o DeveloperIDG2CA.cer https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          security import DeveloperIDG2CA.cer -k build.keychain
+
           security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
-          rm certificate.p12
+          rm certificate.p12 DeveloperIDG2CA.cer
 
       - name: List available signing identities (diagnostic, macOS only)
         if: runner.os == 'macOS'
