@@ -12,7 +12,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * check GitHub for newer version
+ * check GitHub for newer version.
  *
  * How the actual install happens (a running app can't overwrite its own
  *  * files, so this can't be fully invisible):
