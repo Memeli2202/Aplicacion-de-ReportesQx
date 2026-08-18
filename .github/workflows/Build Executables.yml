@@ -63,6 +63,10 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
           rm certificate.p12
 
+      - name: List available signing identities (diagnostic, macOS only)
+        if: runner.os == 'macOS'
+        run: security find-identity -v -p codesigning build.keychain
+
       - name: Prepare a clean jpackage input folder
         shell: bash
         run: |
