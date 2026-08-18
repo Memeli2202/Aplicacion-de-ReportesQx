@@ -73,9 +73,9 @@ jobs:
         env:
           MACOS_CERTIFICATE_NAME: ${{ secrets.MACOS_CERTIFICATE_NAME }}
         run: |
-          SIGN_ARGS=""
+          SIGN_ARGS=()
           if [[ "${{ runner.os }}" == "macOS" ]]; then
-            SIGN_ARGS="--mac-sign --mac-signing-key-user-name $MACOS_CERTIFICATE_NAME"
+            SIGN_ARGS=(--mac-sign --mac-signing-key-user-name "$MACOS_CERTIFICATE_NAME")
           fi
 
           jpackage \
@@ -88,7 +88,7 @@ jobs:
             --dest dist \
             --add-modules java.desktop,java.xml,java.logging,java.naming,java.net.http,java.management,java.security.jgss,java.instrument,jdk.crypto.ec,jdk.crypto.cryptoki,jdk.unsupported,jdk.charsets \
             ${{ matrix.extra-args }} \
-            $SIGN_ARGS
+            "${SIGN_ARGS[@]}"
 
       - name: Rename installer with a unique platform suffix
         shell: bash
