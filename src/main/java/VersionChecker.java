@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  *  *   1. Download the installer to a temp file.
  *  *   2. Write a tiny helper script that waits a couple seconds (giving this
  *  *      JVM time to fully exit), then runs the installer silently.
- *  *   3. Launch that helper script as an independent process, then exit
+ *  *   3. Launch that helper script as an independent process, then exit.
  *
  */
 public class VersionChecker {
