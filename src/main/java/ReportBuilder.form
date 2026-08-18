@@ -3,11 +3,11 @@
   <grid id="27dc6" binding="panelDeContenido" layout-manager="GridLayoutManager" row-count="20" column-count="6" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
     <margin top="10" left="0" bottom="0" right="0"/>
     <constraints>
-      <xy x="20" y="20" width="658" height="763"/>
+      <xy x="20" y="20" width="763" height="763"/>
     </constraints>
     <properties>
       <minimumSize width="500" height="550"/>
-      <preferredSize width="600" height="700"/>
+      <preferredSize width="650" height="700"/>
     </properties>
     <border type="none"/>
     <children>
@@ -439,6 +439,19 @@
                 </properties>
               </component>
               <component id="c0f25" class="javax.swing.JToolBar$Separator">
+                <constraints/>
+                <properties/>
+              </component>
+              <component id="2034c" class="javax.swing.JButton" binding="botonGuardarCambios" custom-create="true">
+                <constraints/>
+                <properties>
+                  <background color="-7743138"/>
+                  <borderPainted value="false"/>
+                  <contentAreaFilled value="false"/>
+                  <text value="Guardar Cambios"/>
+                </properties>
+              </component>
+              <component id="58a84" class="javax.swing.JToolBar$Separator">
                 <constraints/>
                 <properties/>
               </component>

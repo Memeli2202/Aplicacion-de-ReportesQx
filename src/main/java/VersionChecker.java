@@ -25,10 +25,10 @@ import java.util.regex.Pattern;
 public class VersionChecker {
 
     //bump this by hand whenever you tag and publish a new release
-    public static final String CURRENT_VERSION = "1.1.3";
+    public static final String CURRENT_VERSION = "1.2.0";
 
     private static final String REPO = "Memeli2202/Aplicacion-de-ReportesQx"; // <-- update this
-    private static final String APP_NAME = "DesktopReportBuilder"; // <-- must match jpackage --name
+    private static final String APP_NAME = "Doctor Helper"; // <-- must match jpackage --name
     private static final String API_URL = "https://api.github.com/repos/" + REPO + "/releases/latest";
 
     private static class Asset {

@@ -43,12 +43,14 @@ public class ReportBuilder extends JFrame {
     private JButton botonReportesGuradados;
     private JButton botonCerrarSesion;
     private JButton botonVistaPreviaPDF;
+    private JButton botonGuardarCambios;
 
     private Reporte reporte;
     private SaveButtonListener saveButtonListener;
     private List<DialogoImagenes.ImagenComentario> imagenesComentarios = new ArrayList<>();
 
     private final SesionSupabase sesion;
+    private boolean cargadoDesdeBorrador = false;
     private ActivosAppClient.Activos activosCache;
 
     private ActivosAppClient.Activos obtenerActivos() throws IOException, InterruptedException {
@@ -141,6 +143,10 @@ public class ReportBuilder extends JFrame {
 
         //log out
         botonCerrarSesion.addActionListener(e -> cerrarSesion());
+
+        //only usable once a report has actually been loaded
+        botonGuardarCambios.setEnabled(false);
+        botonGuardarCambios.addActionListener(e -> guardarCambios());
 
         //preview report before generating
         botonVistaPreviaPDF.addActionListener(e -> vistaPreviaReporte());
@@ -459,6 +465,8 @@ public class ReportBuilder extends JFrame {
     private void cargarDatosEnFormulario(Reporte cargado, List<DialogoImagenes.ImagenComentario> imagenes) {
         reporte = cargado;
         imagenesComentarios = imagenes;
+        cargadoDesdeBorrador = true;
+        botonGuardarCambios.setEnabled(true);
 
         fecha.setText(safe(cargado.getFecha()));
         nombrePaciente.setText(safe(cargado.getNombre()));
@@ -491,6 +499,65 @@ public class ReportBuilder extends JFrame {
      */
     private static String safe(String texto) {
         return texto == null ? "" : texto;
+    }
+
+    /**
+     * Updates the currently loaded report's data in Supabase
+     */
+    private void guardarCambios() {
+        if (!cargadoDesdeBorrador) {
+            return;
+        }
+
+        reporte.setFecha(fecha.getText());
+        reporte.setNombre(nombrePaciente.getText());
+        reporte.setEdad(edadPaciente.getText());
+        reporte.setCedula(cedula.getText());
+        reporte.setArs(ars.getText());
+        reporte.setProcedimiento(nombreProcedimiento.getText());
+        reporte.setEnzianP(enzianP.getText());
+        reporte.setEnzianO(enzianO.getText());
+        reporte.setEnzianO2(enzianO2.getText());
+        reporte.setEnzianT(enzianT.getText());
+        reporte.setEnzianT2(enzianT2.getText());
+        reporte.setEnzianA(enzianA.getText());
+        reporte.setEnzianB(enzianB.getText());
+        reporte.setEnzianB2(enzianB2.getText());
+        reporte.setEnzianC(enzianC.getText());
+        reporte.setEnzianF(enzianF.getText());
+        reporte.setResumenQx(resumenQx.getText());
+        reporte.setPostQx(postCirugia.getText());
+
+        JDialog progreso = DialogoProgreso.mostrar(panelDeContenido, "Guardando cambios...");
+
+        SwingWorker<Void, Void> worker = new SwingWorker<>() {
+            private Exception error;
+
+            @Override
+            protected Void doInBackground() {
+                try {
+                    SupabaseReportesClient.guardarReporte(sesion, reporte, "finalizado", imagenesComentarios);
+                } catch (Exception e) {
+                    error = e;
+                }
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                progreso.dispose();
+                if (error != null) {
+                    JOptionPane.showMessageDialog(panelDeContenido, "No se pudieron guardar los cambios: " + error.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                JOptionPane.showMessageDialog(panelDeContenido, "Cambios guardados correctamente.");
+            }
+        };
+
+        worker.execute();
+        progreso.setVisible(true);
+
     }
 
     private void cancelarReporte() {
@@ -592,6 +659,7 @@ public class ReportBuilder extends JFrame {
         botonCerrarSesion = new BotonColoreado();
         botonVistaPreviaPDF = new BotonColoreado();
         botonAgregarImagenes = new BotonColoreado();
+        botonGuardarCambios = new BotonColoreado();
     }
 
 
@@ -607,7 +675,7 @@ public class ReportBuilder extends JFrame {
         panelDeContenido = new JPanel();
         panelDeContenido.setLayout(new GridLayoutManager(20, 6, new Insets(10, 0, 0, 0), -1, -1));
         panelDeContenido.setMinimumSize(new Dimension(500, 550));
-        panelDeContenido.setPreferredSize(new Dimension(600, 700));
+        panelDeContenido.setPreferredSize(new Dimension(650, 700));
         final JLabel label1 = new JLabel();
         label1.setText("Fecha (dd/mm/aaaa)");
         panelDeContenido.add(label1, new GridConstraints(1, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(138, 17), null, 0, false));
@@ -713,6 +781,7 @@ public class ReportBuilder extends JFrame {
         panelDeContenido.add(spacer3, new GridConstraints(1, 4, 6, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, 1, null, null, null, 0, false));
         botonAgregarImagenes.setBackground(new Color(-16732991));
         botonAgregarImagenes.setBorderPainted(false);
+        botonAgregarImagenes.setContentAreaFilled(false);
         botonAgregarImagenes.setHideActionText(false);
         botonAgregarImagenes.setText("Agregar Imágenes");
         panelDeContenido.add(botonAgregarImagenes, new GridConstraints(14, 4, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
@@ -756,6 +825,13 @@ public class ReportBuilder extends JFrame {
         mainToolbar.add(botonVistaPreviaPDF);
         final JToolBar.Separator toolBar$Separator3 = new JToolBar.Separator();
         mainToolbar.add(toolBar$Separator3);
+        botonGuardarCambios.setBackground(new Color(-7743138));
+        botonGuardarCambios.setBorderPainted(false);
+        botonGuardarCambios.setContentAreaFilled(false);
+        botonGuardarCambios.setText("Guardar Cambios");
+        mainToolbar.add(botonGuardarCambios);
+        final JToolBar.Separator toolBar$Separator4 = new JToolBar.Separator();
+        mainToolbar.add(toolBar$Separator4);
         botonCerrarSesion.setBackground(new Color(-9494761));
         botonCerrarSesion.setBorderPainted(false);
         botonCerrarSesion.setContentAreaFilled(false);

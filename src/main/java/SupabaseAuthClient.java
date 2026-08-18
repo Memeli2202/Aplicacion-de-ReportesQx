@@ -30,7 +30,7 @@ public class SupabaseAuthClient {
     private static final String SUPABASE_URL = "https://hekiisuiehxoinqqieum.supabase.co"; // <-- update this
     private static final String SUPABASE_PUBLISHABLE_KEY = "sb_publishable_cPrGduWF7C8Et4WOyCsJRA_4Cy2AtYt"; // <-- update this (Project Settings > API Keys)
 
-    private static final Path ARCHIVO_SESION = Path.of(System.getProperty("user.home"), ".desktopreportbuilder", "session.properties");
+    private static final Path ARCHIVO_SESION = Path.of(System.getProperty("user.home"), ".doctorhelper", "session.properties");
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 

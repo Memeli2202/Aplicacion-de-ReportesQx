@@ -9,7 +9,7 @@
       <name value=""/>
       <preferredSize width="400" height="250"/>
     </properties>
-    <border type="empty" title="Iniciar Sesión" title-justification="2">
+    <border type="empty" title="" title-justification="2">
       <title-color color="-16777216"/>
     </border>
     <children>
