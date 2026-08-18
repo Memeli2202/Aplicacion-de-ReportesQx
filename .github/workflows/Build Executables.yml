@@ -69,7 +69,13 @@ jobs:
 
       - name: List available signing identities (diagnostic, macOS only)
         if: runner.os == 'macOS'
-        run: security find-identity -v -p codesigning build.keychain
+        run: |
+          echo "=== all identities, no policy filter ==="
+          security find-identity build.keychain || true
+          echo "=== codesigning identities only ==="
+          security find-identity -v -p codesigning build.keychain || true
+          echo "=== raw certificates in keychain ==="
+          security find-certificate -a build.keychain || true
 
       - name: Prepare a clean jpackage input folder
         shell: bash
