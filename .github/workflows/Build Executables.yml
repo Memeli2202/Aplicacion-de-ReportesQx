@@ -48,6 +48,20 @@ jobs:
       - name: Build fat jar with Maven
         run: mvn -B package
 
+      - name: Import signing certificate (macOS only)
+        if: runner.os == 'macOS'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        run: |
+          echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p actions build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p actions build.keychain
+          security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
+          rm certificate.p12
+
       - name: Prepare a clean jpackage input folder
         shell: bash
         run: |
@@ -56,7 +70,14 @@ jobs:
 
       - name: Package as a native app with jpackage
         shell: bash
+        env:
+          MACOS_CERTIFICATE_NAME: ${{ secrets.MACOS_CERTIFICATE_NAME }}
         run: |
+          SIGN_ARGS=""
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            SIGN_ARGS="--mac-sign --mac-signing-key-user-name $MACOS_CERTIFICATE_NAME"
+          fi
+
           jpackage \
             --input jpackage-input \
             --name DesktopReportBuilder \
@@ -66,7 +87,8 @@ jobs:
             --app-version ${{ steps.version.outputs.version }} \
             --dest dist \
             --add-modules java.desktop,java.xml,java.logging,java.naming,java.net.http,java.management,java.security.jgss,java.instrument,jdk.crypto.ec,jdk.crypto.cryptoki,jdk.unsupported,jdk.charsets \
-            ${{ matrix.extra-args }}
+            ${{ matrix.extra-args }} \
+            $SIGN_ARGS
 
       - name: Rename installer with a unique platform suffix
         shell: bash
@@ -76,6 +98,23 @@ jobs:
             base="${f%.*}"
             mv "$f" "${base}-${{ matrix.suffix }}.${ext}"
           done
+
+      - name: Notarize the installer (macOS only)
+        if: runner.os == 'macOS'
+        env:
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
+        run: |
+          echo "$APPSTORE_API_KEY" | base64 --decode > api_key.p8
+          DMG_FILE=$(find dist -name "*.dmg")
+          xcrun notarytool submit "$DMG_FILE" \
+            --key api_key.p8 \
+            --key-id "$APPSTORE_API_KEY_ID" \
+            --issuer "$APPSTORE_API_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$DMG_FILE"
+          rm api_key.p8
 
       - name: Upload installer
         uses: actions/upload-artifact@v7
