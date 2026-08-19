@@ -126,6 +126,30 @@ public class SupabaseAuthClient {
         }
     }
 
+    /**
+     * Refreshes the access token using the session's own refresh token, and
+     * updates the SAME SesionSupabase object in place (rather than
+     * returning a new one) - this is what lets a single shared session
+     * object stay valid across a long-running app session, since every
+     * class holding a reference to it sees the refreshed token
+     * automatically. Returns false if the refresh itself fails (e.g. the
+     * refresh token has also expired), in which case the caller should
+     * treat the session as fully invalid and prompt for login again.
+     */
+    public static boolean refrescarEnSitio(SesionSupabase sesion) {
+        try {
+            SesionSupabase actualizada = refrescarSesion(sesion.refreshToken);
+            if (actualizada == null) {
+                return false;
+            }
+            sesion.accessToken = actualizada.accessToken;
+            sesion.refreshToken = actualizada.refreshToken;
+            return true;
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
     private static SesionSupabase refrescarSesion(String refreshToken) throws IOException, InterruptedException {
         String cuerpo = MAPPER.writeValueAsString(Map.of("refresh_token", refreshToken));
         HttpRequest request = HttpRequest.newBuilder()
@@ -182,7 +206,7 @@ public class SupabaseAuthClient {
             Properties props = new Properties();
             props.setProperty("refresh_token", sesion.refreshToken);
             try (var out = Files.newOutputStream(ARCHIVO_SESION)) {
-                props.store(out, "Sesion de Desktop Report Builder - no compartir este archivo");
+                props.store(out, "Sesion de Doctor Helper - no compartir este archivo");
             }
         } catch (IOException ignored) {
             //non-fatal - just means the doctor will need to log in again next time

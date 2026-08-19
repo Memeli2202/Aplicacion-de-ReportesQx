@@ -15,6 +15,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 
 public class SupabaseReportesClient {
@@ -54,6 +55,46 @@ public class SupabaseReportesClient {
             this.reporte = reporte;
             this.imagenes = imagenes;
         }
+    }
+
+    /**
+     * Sends a request built from the session's current access token; if the
+     * response indicates an expired JWT, refreshes the session in place and
+     * retries once with the new token. Every API call in this class routes
+     * through this (or its byte[] counterpart below) instead of sending
+     * directly, so a long-running app session doesn't start failing once
+     * the access token's ~1 hour lifetime runs out mid-use.
+     */
+    private static HttpResponse<String> enviarConReintento(SesionSupabase sesion, Function<String, HttpRequest> construirRequest)
+            throws IOException, InterruptedException {
+
+        HttpRequest request = construirRequest.apply(sesion.accessToken);
+        HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (tokenExpirado(response.statusCode(), response.body()) && SupabaseAuthClient.refrescarEnSitio(sesion)) {
+            request = construirRequest.apply(sesion.accessToken);
+            response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+        }
+
+        return response;
+    }
+
+    private static HttpResponse<byte[]> enviarConReintentoBytes(SesionSupabase sesion, Function<String, HttpRequest> construirRequest)
+            throws IOException, InterruptedException {
+
+        HttpRequest request = construirRequest.apply(sesion.accessToken);
+        HttpResponse<byte[]> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
+
+        if (response.statusCode() == 401 && SupabaseAuthClient.refrescarEnSitio(sesion)) {
+            request = construirRequest.apply(sesion.accessToken);
+            response = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
+        }
+
+        return response;
+    }
+
+    private static boolean tokenExpirado(int statusCode, String body) {
+        return statusCode == 401 || (body != null && body.contains("PGRST303"));
     }
 
     /**
@@ -98,16 +139,17 @@ public class SupabaseReportesClient {
     }
 
     private static String insertarReporte(SesionSupabase sesion, ObjectNode cuerpo) throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder()
+        String cuerpoJson = MAPPER.writeValueAsString(cuerpo);
+
+        HttpResponse<String> response = enviarConReintento(sesion, token -> HttpRequest.newBuilder()
                 .uri(URI.create(SUPABASE_URL + "/rest/v1/reportes"))
                 .header("apikey", SUPABASE_PUBLISHABLE_KEY)
-                .header("Authorization", "Bearer " + sesion.accessToken)
+                .header("Authorization", "Bearer " + token)
                 .header("Content-Type", "application/json")
                 .header("Prefer", "return=representation")
-                .POST(HttpRequest.BodyPublishers.ofString(MAPPER.writeValueAsString(cuerpo)))
-                .build();
+                .POST(HttpRequest.BodyPublishers.ofString(cuerpoJson))
+                .build());
 
-        HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 300) {
             throw new IOException("Error al guardar el reporte: " + response.body());
         }
@@ -116,15 +158,16 @@ public class SupabaseReportesClient {
     }
 
     private static void actualizarReporte(SesionSupabase sesion, String id, ObjectNode cuerpo) throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder()
+        String cuerpoJson = MAPPER.writeValueAsString(cuerpo);
+
+        HttpResponse<String> response = enviarConReintento(sesion, token -> HttpRequest.newBuilder()
                 .uri(URI.create(SUPABASE_URL + "/rest/v1/reportes?id=eq." + id))
                 .header("apikey", SUPABASE_PUBLISHABLE_KEY)
-                .header("Authorization", "Bearer " + sesion.accessToken)
+                .header("Authorization", "Bearer " + token)
                 .header("Content-Type", "application/json")
-                .method("PATCH", HttpRequest.BodyPublishers.ofString(MAPPER.writeValueAsString(cuerpo)))
-                .build();
+                .method("PATCH", HttpRequest.BodyPublishers.ofString(cuerpoJson))
+                .build());
 
-        HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 300) {
             throw new IOException("Error al actualizar el reporte: " + response.body());
         }
@@ -150,16 +193,16 @@ public class SupabaseReportesClient {
             fila.put("orden", orden);
             fila.put("comentario", ic.getComentario());
             fila.put("storage_path", path);
+            String filaJson = MAPPER.writeValueAsString(fila);
 
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpResponse<String> response = enviarConReintento(sesion, token -> HttpRequest.newBuilder()
                     .uri(URI.create(SUPABASE_URL + "/rest/v1/reporte_imagenes"))
                     .header("apikey", SUPABASE_PUBLISHABLE_KEY)
-                    .header("Authorization", "Bearer " + sesion.accessToken)
+                    .header("Authorization", "Bearer " + token)
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(MAPPER.writeValueAsString(fila)))
-                    .build();
+                    .POST(HttpRequest.BodyPublishers.ofString(filaJson))
+                    .build());
 
-            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() >= 300) {
                 throw new IOException("Error al guardar imagen " + orden + ": " + response.body());
             }
@@ -168,13 +211,13 @@ public class SupabaseReportesClient {
     }
 
     private static void eliminarImagenesExistentes(SesionSupabase sesion, String reporteId) throws IOException, InterruptedException {
-        HttpRequest consulta = HttpRequest.newBuilder()
+        HttpResponse<String> respuestaConsulta = enviarConReintento(sesion, token -> HttpRequest.newBuilder()
                 .uri(URI.create(SUPABASE_URL + "/rest/v1/reporte_imagenes?reporte_id=eq." + reporteId + "&select=storage_path"))
                 .header("apikey", SUPABASE_PUBLISHABLE_KEY)
-                .header("Authorization", "Bearer " + sesion.accessToken)
+                .header("Authorization", "Bearer " + token)
                 .GET()
-                .build();
-        HttpResponse<String> respuestaConsulta = CLIENT.send(consulta, HttpResponse.BodyHandlers.ofString());
+                .build());
+
         JsonNode filas = MAPPER.readTree(respuestaConsulta.body());
 
         if (filas.isArray() && !filas.isEmpty()) {
@@ -185,57 +228,55 @@ public class SupabaseReportesClient {
             eliminarArchivosStorage(sesion, rutas);
         }
 
-        HttpRequest borrar = HttpRequest.newBuilder()
+        enviarConReintento(sesion, token -> HttpRequest.newBuilder()
                 .uri(URI.create(SUPABASE_URL + "/rest/v1/reporte_imagenes?reporte_id=eq." + reporteId))
                 .header("apikey", SUPABASE_PUBLISHABLE_KEY)
-                .header("Authorization", "Bearer " + sesion.accessToken)
+                .header("Authorization", "Bearer " + token)
                 .DELETE()
-                .build();
-        CLIENT.send(borrar, HttpResponse.BodyHandlers.discarding());
+                .build());
     }
 
     private static void eliminarArchivosStorage(SesionSupabase sesion, List<String> rutas) throws IOException, InterruptedException {
         ObjectNode cuerpo = MAPPER.createObjectNode();
         ArrayNode prefijos = cuerpo.putArray("prefixes");
         rutas.forEach(prefijos::add);
+        String cuerpoJson = MAPPER.writeValueAsString(cuerpo);
 
-        HttpRequest request = HttpRequest.newBuilder()
+        enviarConReintento(sesion, token -> HttpRequest.newBuilder()
                 .uri(URI.create(SUPABASE_URL + "/storage/v1/object/" + BUCKET))
                 .header("apikey", SUPABASE_PUBLISHABLE_KEY)
-                .header("Authorization", "Bearer " + sesion.accessToken)
+                .header("Authorization", "Bearer " + token)
                 .header("Content-Type", "application/json")
-                .method("DELETE", HttpRequest.BodyPublishers.ofString(MAPPER.writeValueAsString(cuerpo)))
-                .build();
-        CLIENT.send(request, HttpResponse.BodyHandlers.discarding());
+                .method("DELETE", HttpRequest.BodyPublishers.ofString(cuerpoJson))
+                .build());
     }
 
     private static void subirImagen(SesionSupabase sesion, String path, BufferedImage imagen) throws IOException, InterruptedException {
         ByteArrayOutputStream os = new ByteArrayOutputStream();
         ImageIO.write(imagen, "jpg", os);
+        byte[] bytes = os.toByteArray();
 
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpResponse<String> response = enviarConReintento(sesion, token -> HttpRequest.newBuilder()
                 .uri(URI.create(SUPABASE_URL + "/storage/v1/object/" + BUCKET + "/" + path))
                 .header("apikey", SUPABASE_PUBLISHABLE_KEY)
-                .header("Authorization", "Bearer " + sesion.accessToken)
+                .header("Authorization", "Bearer " + token)
                 .header("Content-Type", "image/jpeg")
-                .POST(HttpRequest.BodyPublishers.ofByteArray(os.toByteArray()))
-                .build();
+                .POST(HttpRequest.BodyPublishers.ofByteArray(bytes))
+                .build());
 
-        HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 300) {
             throw new IOException("Error al subir imagen: " + response.body());
         }
     }
 
     public static List<ResumenBorrador> listarReportes(SesionSupabase sesion) throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpResponse<String> response = enviarConReintento(sesion, token -> HttpRequest.newBuilder()
                 .uri(URI.create(SUPABASE_URL + "/rest/v1/reportes?select=id,nombre,cedula,fecha,estado&order=updated_at.desc"))
                 .header("apikey", SUPABASE_PUBLISHABLE_KEY)
-                .header("Authorization", "Bearer " + sesion.accessToken)
+                .header("Authorization", "Bearer " + token)
                 .GET()
-                .build();
+                .build());
 
-        HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 300) {
             throw new IOException("Error al cargar la lista de reportes: " + response.body());
         }
@@ -255,14 +296,13 @@ public class SupabaseReportesClient {
     }
 
     public static ResultadoCarga cargarReporte(SesionSupabase sesion, String id) throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpResponse<String> response = enviarConReintento(sesion, token -> HttpRequest.newBuilder()
                 .uri(URI.create(SUPABASE_URL + "/rest/v1/reportes?id=eq." + id + "&select=*"))
                 .header("apikey", SUPABASE_PUBLISHABLE_KEY)
-                .header("Authorization", "Bearer " + sesion.accessToken)
+                .header("Authorization", "Bearer " + token)
                 .GET()
-                .build();
+                .build());
 
-        HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 300) {
             throw new IOException("Error al cargar el reporte: " + response.body());
         }
@@ -300,14 +340,13 @@ public class SupabaseReportesClient {
     private static List<DialogoImagenes.ImagenComentario> cargarImagenesDeReporte(SesionSupabase sesion, String reporteId)
             throws IOException, InterruptedException {
 
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpResponse<String> response = enviarConReintento(sesion, token -> HttpRequest.newBuilder()
                 .uri(URI.create(SUPABASE_URL + "/rest/v1/reporte_imagenes?reporte_id=eq." + reporteId + "&select=orden,comentario,storage_path&order=orden.asc"))
                 .header("apikey", SUPABASE_PUBLISHABLE_KEY)
-                .header("Authorization", "Bearer " + sesion.accessToken)
+                .header("Authorization", "Bearer " + token)
                 .GET()
-                .build();
+                .build());
 
-        HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 300) {
             throw new IOException("Error al cargar las imágenes: " + response.body());
         }
@@ -326,14 +365,13 @@ public class SupabaseReportesClient {
     }
 
     private static BufferedImage descargarImagen(SesionSupabase sesion, String path) throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpResponse<byte[]> response = enviarConReintentoBytes(sesion, token -> HttpRequest.newBuilder()
                 .uri(URI.create(SUPABASE_URL + "/storage/v1/object/" + BUCKET + "/" + path))
                 .header("apikey", SUPABASE_PUBLISHABLE_KEY)
-                .header("Authorization", "Bearer " + sesion.accessToken)
+                .header("Authorization", "Bearer " + token)
                 .GET()
-                .build();
+                .build());
 
-        HttpResponse<byte[]> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
         if (response.statusCode() >= 300) {
             return null; //skip a missing/failed image rather than failing the whole load
         }

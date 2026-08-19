@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 public class VersionChecker {
 
     //bump this by hand whenever you tag and publish a new release
-    public static final String CURRENT_VERSION = "1.2.1";
+    public static final String CURRENT_VERSION = "1.2.2";
 
     private static final String REPO = "Memeli2202/Aplicacion-de-ReportesQx"; // <-- update this
     private static final String APP_NAME = "Doctor Helper"; // <-- must match jpackage --name

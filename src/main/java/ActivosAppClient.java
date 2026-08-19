@@ -64,7 +64,7 @@ public class ActivosAppClient {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(SUPABASE_URL + "/storage/v1" + signedUrlPath))
-                .timeout(Duration.ofSeconds(10))
+                .timeout(Duration.ofSeconds(20))
                 .GET()
                 .build();
 
@@ -76,21 +76,39 @@ public class ActivosAppClient {
     }
 
     private static String obtenerUrlFirmada(SesionSupabase sesion, String nombreArchivo) throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpResponse<String> response = enviarConReintento(sesion, token -> HttpRequest.newBuilder()
                 .uri(URI.create(SUPABASE_URL + "/storage/v1/object/sign/" + BUCKET + "/" + nombreArchivo))
                 .header("apikey", SUPABASE_PUBLISHABLE_KEY)
-                .header("Authorization", "Bearer " + sesion.accessToken)
+                .header("Authorization", "Bearer " + token)
                 .header("Content-Type", "application/json")
-                .timeout(Duration.ofSeconds(10))
+                .timeout(Duration.ofSeconds(20))
                 .POST(HttpRequest.BodyPublishers.ofString("{\"expiresIn\": 3600}"))
-                .build();
+                .build());
 
-        HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 300) {
             return null;
         }
 
         JsonNode json = MAPPER.readTree(response.body());
         return json.has("signedURL") ? json.get("signedURL").asText() : null;
+    }
+
+    /**
+     * Same retry-on-expired-token pattern as SupabaseReportesClient - see
+     * that class for the full explanation.
+     */
+    private static HttpResponse<String> enviarConReintento(SesionSupabase sesion, java.util.function.Function<String, HttpRequest> construirRequest)
+            throws IOException, InterruptedException {
+
+        HttpRequest request = construirRequest.apply(sesion.accessToken);
+        HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+        boolean tokenExpirado = response.statusCode() == 401 || (response.body() != null && response.body().contains("PGRST303"));
+        if (tokenExpirado && SupabaseAuthClient.refrescarEnSitio(sesion)) {
+            request = construirRequest.apply(sesion.accessToken);
+            response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+        }
+
+        return response;
     }
 }
