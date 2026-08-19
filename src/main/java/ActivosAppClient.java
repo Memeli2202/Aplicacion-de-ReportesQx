@@ -34,7 +34,7 @@ public class ActivosAppClient {
     private static final String SUPABASE_PUBLISHABLE_KEY = "sb_publishable_cPrGduWF7C8Et4WOyCsJRA_4Cy2AtYt"; // <-- update this
     private static final String BUCKET = "activos-app";
 
-    private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public static class Activos {

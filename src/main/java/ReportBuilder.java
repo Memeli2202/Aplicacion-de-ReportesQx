@@ -54,7 +54,7 @@ public class ReportBuilder extends JFrame {
     private ActivosAppClient.Activos activosCache;
 
     private ActivosAppClient.Activos obtenerActivos() throws IOException, InterruptedException {
-        if (activosCache == null) {
+        if (activosCache == null || activosCache.logo == null || activosCache.sello == null || activosCache.marcaAgua == null) {
             activosCache = ActivosAppClient.cargarActivos(sesion);
         }
         return activosCache;
@@ -145,7 +145,6 @@ public class ReportBuilder extends JFrame {
         botonCerrarSesion.addActionListener(e -> cerrarSesion());
 
         //only usable once a report has actually been loaded
-        botonGuardarCambios.setEnabled(false);
         botonGuardarCambios.addActionListener(e -> guardarCambios());
 
         //preview report before generating
@@ -466,7 +465,6 @@ public class ReportBuilder extends JFrame {
         reporte = cargado;
         imagenesComentarios = imagenes;
         cargadoDesdeBorrador = true;
-        botonGuardarCambios.setEnabled(true);
 
         fecha.setText(safe(cargado.getFecha()));
         nombrePaciente.setText(safe(cargado.getNombre()));
