@@ -113,11 +113,28 @@ jobs:
         run: |
           echo "$APPSTORE_API_KEY" | base64 --decode > api_key.p8
           DMG_FILE=$(find dist -name "*.dmg")
-          xcrun notarytool submit "$DMG_FILE" \
+
+          SUBMISSION_OUTPUT=$(xcrun notarytool submit "$DMG_FILE" \
             --key api_key.p8 \
             --key-id "$APPSTORE_API_KEY_ID" \
             --issuer "$APPSTORE_API_ISSUER_ID" \
-            --wait
+            --wait)
+
+          echo "$SUBMISSION_OUTPUT"
+
+          SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep -m1 "id:" | awk '{print $2}')
+          STATUS=$(echo "$SUBMISSION_OUTPUT" | grep "status:" | tail -1 | awk '{print $2}')
+
+          if [[ "$STATUS" != "Accepted" ]]; then
+            echo "Notarization was not accepted (status: $STATUS). Fetching Apple's detailed log..."
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --key api_key.p8 \
+              --key-id "$APPSTORE_API_KEY_ID" \
+              --issuer "$APPSTORE_API_ISSUER_ID"
+            rm api_key.p8
+            exit 1
+          fi
+
           xcrun stapler staple "$DMG_FILE"
           rm api_key.p8
 
