@@ -1,15 +1,29 @@
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- *
+ * Lets the doctor browse their saved reports in a proper table (Nombre,
+ * Cédula, Fecha, Estado columns) and pick one to reopen. Supports live
+ * filtering by name, cedula, date, or all fields at once - filtering
+ * happens entirely client-side against the already-fetched summary list,
+ * so it's instant with no extra network calls.
  */
 public class DialogoBorradores extends JDialog {
     private SupabaseReportesClient.ResumenBorrador seleccionado;
-    private final JList<SupabaseReportesClient.ResumenBorrador> lista = new JList<>();
+    private final DefaultTableModel modeloTabla = new DefaultTableModel(
+            new Object[]{"Nombre", "Cédula", "Fecha", "Estado"}, 0) {
+        @Override
+        public boolean isCellEditable(int fila, int columna) {
+            return false;
+        }
+    };
+    private final JTable tabla = new JTable(modeloTabla);
+    private final List<SupabaseReportesClient.ResumenBorrador> filasActuales = new ArrayList<>();
     private final List<SupabaseReportesClient.ResumenBorrador> todosLosBorradores;
     private final JTextField campoBusqueda = new JTextField(18);
     private final JComboBox<String> tipoFiltro = new JComboBox<>(new String[]{"Todos", "Nombre", "Cédula", "Fecha"});
@@ -18,20 +32,27 @@ public class DialogoBorradores extends JDialog {
         super(parent, "Reportes Guardados", true);
         this.todosLosBorradores = borradores;
 
-        lista.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        lista.setVisibleRowCount(12);
+        tabla.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tabla.setRowSelectionAllowed(true);
+        tabla.setColumnSelectionAllowed(false);
+        tabla.setAutoCreateRowSorter(true);
+        tabla.setRowHeight(24);
+        tabla.getTableHeader().setReorderingAllowed(false);
 
         JButton botonAbrir = new BotonColoreado();
         botonAbrir.setText("Abrir");
         botonAbrir.setBackground(new Color(0, 172, 193));
         botonAbrir.setForeground(Color.WHITE);
         botonAbrir.addActionListener(e -> {
-            seleccionado = lista.getSelectedValue();
-            if (seleccionado != null) {
-                dispose();
-            } else {
+            int filaSeleccionada = tabla.getSelectedRow();
+            if (filaSeleccionada < 0) {
                 JOptionPane.showMessageDialog(this, "Selecciona un reporte primero");
+                return;
             }
+            //convert from the (possibly sorted) view row to the underlying data row
+            int filaModelo = tabla.convertRowIndexToModel(filaSeleccionada);
+            seleccionado = filasActuales.get(filaModelo);
+            dispose();
         });
 
         JButton botonCancelar = new BotonColoreado();
@@ -74,32 +95,36 @@ public class DialogoBorradores extends JDialog {
             tipoFiltro.addActionListener(e -> aplicarFiltro());
 
             add(barraBusqueda, BorderLayout.NORTH);
-            add(new JScrollPane(lista), BorderLayout.CENTER);
+            add(new JScrollPane(tabla), BorderLayout.CENTER);
             aplicarFiltro();
         }
 
         add(botones, BorderLayout.SOUTH);
 
-        setSize(460, 460);
+        setSize(640, 460);
         setLocationRelativeTo(parent);
     }
 
     /**
-     * Rebuilds the displayed list based on the current search text and
-     * selected filter type - "Todos" checks name/cedula/date together,
-     * the others restrict the match to just that one field.
+     * Rebuilds the displayed table rows based on the current search text
+     * and selected filter type - "Todos" checks name/cedula/date together,
+     * the others restrict the match to just that one field. filasActuales
+     * is kept in sync with the table's rows so a selected row can be
+     * mapped back to its actual ResumenBorrador object.
      */
     private void aplicarFiltro() {
         String texto = campoBusqueda.getText().trim().toLowerCase();
         String tipo = (String) tipoFiltro.getSelectedItem();
 
-        DefaultListModel<SupabaseReportesClient.ResumenBorrador> modelo = new DefaultListModel<>();
+        modeloTabla.setRowCount(0);
+        filasActuales.clear();
+
         for (SupabaseReportesClient.ResumenBorrador b : todosLosBorradores) {
             if (coincide(b, texto, tipo)) {
-                modelo.addElement(b);
+                filasActuales.add(b);
+                modeloTabla.addRow(new Object[]{safe(b.nombre), safe(b.cedula), safe(b.fecha), safe(b.estado)});
             }
         }
-        lista.setModel(modelo);
     }
 
     private boolean coincide(SupabaseReportesClient.ResumenBorrador b, String texto, String tipo) {
@@ -133,4 +158,3 @@ public class DialogoBorradores extends JDialog {
         return dialogo.seleccionado;
     }
 }
-

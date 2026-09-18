@@ -202,7 +202,7 @@ public class PdfReportGenerator {
                 bloqueTexto.add(new Paragraph("Endometriosis Infiltrativa Profunda").setFontSize(8).setMargin(0));
                 documentoFinal.add(bloqueTexto);
 
-                float anchoSello = 130f;
+                float anchoSello = 156f;
                 float altoSello = anchoSello * sello.getHeight() / sello.getWidth();
                 float alturaTextoAprox = 70f;
 
