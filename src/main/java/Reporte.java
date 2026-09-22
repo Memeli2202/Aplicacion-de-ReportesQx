@@ -1,6 +1,7 @@
 public class Reporte {
 
     private String id;
+    private String doctorId;
     private String fecha;
     private String nombre;
     private String edad;
@@ -49,6 +50,9 @@ public class Reporte {
         return id;
     }
     public void setId(String id) {this.id = id;}
+
+    public String getDoctorId() {return doctorId;}
+    public void setDoctorId(String doctorId) {this.doctorId = doctorId;}
 
     public String getFecha() {
         return fecha;

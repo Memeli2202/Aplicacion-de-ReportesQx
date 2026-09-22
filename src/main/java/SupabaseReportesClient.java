@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
@@ -32,18 +33,37 @@ public class SupabaseReportesClient {
         public final String cedula;
         public final String fecha;
         public final String estado;
+        public final LocalDate fechaDate; //null for old reports saved before fecha_date existed, or if unparseable
+        public final String doctorId;
 
-        public ResumenBorrador(String id, String nombre, String cedula, String fecha, String estado) {
+        public ResumenBorrador(String id, String nombre, String cedula, String fecha, String estado, LocalDate fechaDate, String doctorId) {
             this.id = id;
             this.nombre = nombre;
             this.cedula = cedula;
             this.fecha = fecha;
             this.estado = estado;
+            this.fechaDate = fechaDate;
+            this.doctorId = doctorId;
         }
 
         @Override
         public String toString() {
             return nombre + " - " + cedula + " (" + fecha + ") [" + estado + "]";
+        }
+    }
+
+    public static class DoctorInfo {
+        public final String id;
+        public final String nombre;
+
+        public DoctorInfo(String id, String nombre) {
+            this.id = id;
+            this.nombre = nombre;
+        }
+
+        @Override
+        public String toString() {
+            return nombre;
         }
     }
 
@@ -106,7 +126,10 @@ public class SupabaseReportesClient {
                                       List<DialogoImagenes.ImagenComentario> imagenes) throws IOException, InterruptedException {
 
         ObjectNode cuerpo = MAPPER.createObjectNode();
-        cuerpo.put("doctor_id", sesion.userId);
+        //an admin may have explicitly assigned/reassigned this report to a different doctor;
+        //otherwise it belongs to whoever is actually saving it (the normal case)
+        String doctorId = reporte.getDoctorId() != null ? reporte.getDoctorId() : sesion.userId;
+        cuerpo.put("doctor_id", doctorId);
         cuerpo.put("estado", estado);
         cuerpo.put("fecha", reporte.getFecha());
         cuerpo.put("nombre", reporte.getNombre());
@@ -126,6 +149,14 @@ public class SupabaseReportesClient {
         cuerpo.put("enzian_f", reporte.getEnzianF());
         cuerpo.put("resumen_qx", reporte.getResumenQx());
         cuerpo.put("post_qx", reporte.getPostQx());
+
+        //fecha_date is the real, filterable date - parsed from the dd/mm/yyyy display value.
+        //left null (omitted) if it doesn't parse, e.g. an old free-text value never corrected
+        //through the calendar picker - doesn't block saving the rest of the report either way.
+        LocalDate fechaParseada = SelectorFecha.parsear(reporte.getFecha());
+        if (fechaParseada != null) {
+            cuerpo.put("fecha_date", fechaParseada.toString()); //ISO yyyy-MM-dd, what Postgres expects
+        }
 
         String id = reporte.getId();
         if (id == null) {
@@ -269,9 +300,36 @@ public class SupabaseReportesClient {
         }
     }
 
+    /**
+     * Fetches every doctor (perfiles.rol = 'doctor'), for populating the
+     * admin-only assignment dropdown. Row Level Security on perfiles
+     * already restricts this to admins in practice - a non-admin calling
+     * this would only see their own row - but this is only ever called
+     * from admin-only UI to begin with.
+     */
+    public static List<DoctorInfo> listarDoctores(SesionSupabase sesion) throws IOException, InterruptedException {
+        HttpResponse<String> response = enviarConReintento(sesion, token -> HttpRequest.newBuilder()
+                .uri(URI.create(SUPABASE_URL + "/rest/v1/perfiles?rol=eq.doctor&select=id,nombre&order=nombre.asc"))
+                .header("apikey", SUPABASE_PUBLISHABLE_KEY)
+                .header("Authorization", "Bearer " + token)
+                .GET()
+                .build());
+
+        if (response.statusCode() >= 300) {
+            throw new IOException("Error al cargar la lista de doctores: " + response.body());
+        }
+
+        List<DoctorInfo> resultado = new ArrayList<>();
+        JsonNode json = MAPPER.readTree(response.body());
+        for (JsonNode fila : json) {
+            resultado.add(new DoctorInfo(fila.get("id").asText(), texto(fila, "nombre")));
+        }
+        return resultado;
+    }
+
     public static List<ResumenBorrador> listarReportes(SesionSupabase sesion) throws IOException, InterruptedException {
         HttpResponse<String> response = enviarConReintento(sesion, token -> HttpRequest.newBuilder()
-                .uri(URI.create(SUPABASE_URL + "/rest/v1/reportes?select=id,nombre,cedula,fecha,estado&order=updated_at.desc"))
+                .uri(URI.create(SUPABASE_URL + "/rest/v1/reportes?select=id,nombre,cedula,fecha,estado,fecha_date,doctor_id&order=updated_at.desc"))
                 .header("apikey", SUPABASE_PUBLISHABLE_KEY)
                 .header("Authorization", "Bearer " + token)
                 .GET()
@@ -284,12 +342,22 @@ public class SupabaseReportesClient {
         List<ResumenBorrador> resultado = new ArrayList<>();
         JsonNode json = MAPPER.readTree(response.body());
         for (JsonNode fila : json) {
+            LocalDate fechaDate = null;
+            JsonNode fechaDateNode = fila.get("fecha_date");
+            if (fechaDateNode != null && !fechaDateNode.isNull()) {
+                try {
+                    fechaDate = LocalDate.parse(fechaDateNode.asText());
+                } catch (Exception ignored) {
+                }
+            }
             resultado.add(new ResumenBorrador(
                     fila.get("id").asText(),
                     texto(fila, "nombre"),
                     texto(fila, "cedula"),
                     texto(fila, "fecha"),
-                    texto(fila, "estado")
+                    texto(fila, "estado"),
+                    fechaDate,
+                    texto(fila, "doctor_id")
             ));
         }
         return resultado;
@@ -314,6 +382,7 @@ public class SupabaseReportesClient {
 
         Reporte reporte = new Reporte();
         reporte.setId(fila.get("id").asText());
+        reporte.setDoctorId(texto(fila, "doctor_id"));
         reporte.setFecha(texto(fila, "fecha"));
         reporte.setNombre(texto(fila, "nombre"));
         reporte.setEdad(texto(fila, "edad"));

@@ -12,7 +12,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 public class ReportBuilder extends JFrame {
@@ -50,6 +52,8 @@ public class ReportBuilder extends JFrame {
     private List<DialogoImagenes.ImagenComentario> imagenesComentarios = new ArrayList<>();
 
     private final SesionSupabase sesion;
+    private JComboBox<SupabaseReportesClient.DoctorInfo> comboAsignarDoctor;
+    private List<SupabaseReportesClient.DoctorInfo> listaDoctores;
     private boolean cargadoDesdeBorrador = false;
     private ActivosAppClient.Activos activosCache;
 
@@ -150,6 +154,21 @@ public class ReportBuilder extends JFrame {
         //preview report before generating
         botonVistaPreviaPDF.addActionListener(e -> vistaPreviaReporte());
 
+        //fecha is now picked via calendar popup instead of free text, stored as dd/mm/yyyy
+        SelectorFecha.adjuntarA(fecha);
+
+        //admin-only: assign/reassign this report to a specific doctor
+        if (sesion.esAdmin()) {
+            comboAsignarDoctor = new JComboBox<>();
+            comboAsignarDoctor.setPreferredSize(new Dimension(200, comboAsignarDoctor.getPreferredSize().height));
+            comboAsignarDoctor.setMaximumSize(comboAsignarDoctor.getPreferredSize());
+            mainToolbar.addSeparator();
+            mainToolbar.add(new JLabel("Asignar a: "));
+            mainToolbar.add(comboAsignarDoctor);
+            cargarListaDeDoctores();
+        }
+
+
         //set the frame visible
         setVisible(true);
 
@@ -178,6 +197,7 @@ public class ReportBuilder extends JFrame {
 
     public void vistaPreviaReporte() {
         reporte.setFecha(fecha.getText());
+        actualizarDoctorAsignado();
         reporte.setNombre(nombrePaciente.getText());
         reporte.setEdad(edadPaciente.getText());
         reporte.setCedula(cedula.getText());
@@ -249,6 +269,7 @@ public class ReportBuilder extends JFrame {
     private void generarReporte() {
 
         reporte.setFecha(fecha.getText());
+        actualizarDoctorAsignado();
         reporte.setNombre(nombrePaciente.getText());
         reporte.setEdad(edadPaciente.getText());
         reporte.setCedula(cedula.getText());
@@ -397,7 +418,16 @@ public class ReportBuilder extends JFrame {
                     return;
                 }
 
-                SupabaseReportesClient.ResumenBorrador elegido = DialogoBorradores.mostrar(ReportBuilder.this, lista);
+                SupabaseReportesClient.ResumenBorrador elegido;
+                if (sesion.esAdmin() && listaDoctores != null) {
+                    Map<String, String> nombresPorDoctorId = new HashMap<>();
+                    for (SupabaseReportesClient.DoctorInfo doctor : listaDoctores) {
+                        nombresPorDoctorId.put(doctor.id, doctor.nombre);
+                    }
+                    elegido = DialogoBorradores.mostrar(ReportBuilder.this, lista, nombresPorDoctorId);
+                } else {
+                    elegido = DialogoBorradores.mostrar(ReportBuilder.this, lista);
+                }
                 if (elegido != null) {
                     cargarReportePorId(elegido.id);
                 }
@@ -456,6 +486,57 @@ public class ReportBuilder extends JFrame {
     }
 
     /**
+     *
+     */
+    private void cargarListaDeDoctores() {
+        SwingWorker<List<SupabaseReportesClient.DoctorInfo>, Void> worker = new SwingWorker<>() {
+
+            @Override
+            protected List<SupabaseReportesClient.DoctorInfo> doInBackground() {
+                try {
+                    return SupabaseReportesClient.listarDoctores(sesion);
+                } catch (Exception e) {
+                    return List.of();
+                }
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    listaDoctores = get();
+                    for (SupabaseReportesClient.DoctorInfo doctor : listaDoctores) {
+                        comboAsignarDoctor.addItem(doctor);
+                    }
+                    seleccionarDoctorEnCombo(sesion.userId);
+                } catch (Exception ignored) {
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void actualizarDoctorAsignado() {
+        if (comboAsignarDoctor != null) {
+            SupabaseReportesClient.DoctorInfo seleccionado = (SupabaseReportesClient.DoctorInfo) comboAsignarDoctor.getSelectedItem();
+            if (seleccionado != null) {
+                reporte.setDoctorId(seleccionado.id);
+            }
+        }
+    }
+
+    private void seleccionarDoctorEnCombo(String doctorId) {
+        if (comboAsignarDoctor == null || doctorId == null) {
+            return;
+        }
+        for (int i = 0; i < comboAsignarDoctor.getItemCount(); i++) {
+            if (doctorId.equals(comboAsignarDoctor.getItemAt(i).id)) {
+                comboAsignarDoctor.setSelectedIndex(i);
+                return;
+            }
+        }
+    }
+
+    /**
      * Loads the information of the saved report onto the form
      *
      * @param cargado  the saved report information
@@ -465,6 +546,7 @@ public class ReportBuilder extends JFrame {
         reporte = cargado;
         imagenesComentarios = imagenes;
         cargadoDesdeBorrador = true;
+        seleccionarDoctorEnCombo(cargado.getDoctorId());
 
         fecha.setText(safe(cargado.getFecha()));
         nombrePaciente.setText(safe(cargado.getNombre()));
@@ -508,6 +590,7 @@ public class ReportBuilder extends JFrame {
         }
 
         reporte.setFecha(fecha.getText());
+        actualizarDoctorAsignado();
         reporte.setNombre(nombrePaciente.getText());
         reporte.setEdad(edadPaciente.getText());
         reporte.setCedula(cedula.getText());
@@ -608,6 +691,7 @@ public class ReportBuilder extends JFrame {
             return;
         }
 
+        seleccionarDoctorEnCombo(sesion.userId);
         fecha.setText("");
         nombreProcedimiento.setText("");
         nombrePaciente.setText("");
