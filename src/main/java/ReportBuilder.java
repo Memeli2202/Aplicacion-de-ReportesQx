@@ -391,11 +391,21 @@ public class ReportBuilder extends JFrame {
 
         SwingWorker<List<SupabaseReportesClient.ResumenBorrador>, Void> worker = new SwingWorker<>() {
             private Exception error;
+            private Map<String, String> nombresPorDoctorId;
 
             @Override
             protected List<SupabaseReportesClient.ResumenBorrador> doInBackground() {
                 try {
-                    return SupabaseReportesClient.listarReportes(sesion);
+                    List<SupabaseReportesClient.ResumenBorrador> lista = SupabaseReportesClient.listarReportes(sesion);
+
+                    if (sesion.esAdmin()) {
+                        nombresPorDoctorId = new HashMap<>();
+                        for (SupabaseReportesClient.DoctorInfo doctor : SupabaseReportesClient.listarDoctores(sesion)) {
+                            nombresPorDoctorId.put(doctor.id, doctor.nombre);
+                        }
+                    }
+
+                    return lista;
                 } catch (Exception e) {
                     error = e;
                     return null;
@@ -419,11 +429,7 @@ public class ReportBuilder extends JFrame {
                 }
 
                 SupabaseReportesClient.ResumenBorrador elegido;
-                if (sesion.esAdmin() && listaDoctores != null) {
-                    Map<String, String> nombresPorDoctorId = new HashMap<>();
-                    for (SupabaseReportesClient.DoctorInfo doctor : listaDoctores) {
-                        nombresPorDoctorId.put(doctor.id, doctor.nombre);
-                    }
+                if (nombresPorDoctorId != null) {
                     elegido = DialogoBorradores.mostrar(ReportBuilder.this, lista, nombresPorDoctorId);
                 } else {
                     elegido = DialogoBorradores.mostrar(ReportBuilder.this, lista);

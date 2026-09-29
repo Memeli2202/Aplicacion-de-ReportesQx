@@ -327,6 +327,34 @@ public class SupabaseReportesClient {
         return resultado;
     }
 
+    /**
+     * Every profile regardless of role, for resolving "who is this report
+     * assigned to" display names - a report's doctor_id can be an admin's
+     * own id (the default when an admin creates one without reassigning),
+     * not just an actual doctor's, so name lookups need this broader list.
+     * The assignment dropdown itself still uses listarDoctores() above,
+     * since you'd only ever want to assign a report TO a doctor.
+     */
+    public static List<DoctorInfo> listarTodosLosPerfiles(SesionSupabase sesion) throws IOException, InterruptedException {
+        HttpResponse<String> response = enviarConReintento(sesion, token -> HttpRequest.newBuilder()
+                .uri(URI.create(SUPABASE_URL + "/rest/v1/perfiles?select=id,nombre&order=nombre.asc"))
+                .header("apikey", SUPABASE_PUBLISHABLE_KEY)
+                .header("Authorization", "Bearer " + token)
+                .GET()
+                .build());
+
+        if (response.statusCode() >= 300) {
+            throw new IOException("Error al cargar los perfiles: " + response.body());
+        }
+
+        List<DoctorInfo> resultado = new ArrayList<>();
+        JsonNode json = MAPPER.readTree(response.body());
+        for (JsonNode fila : json) {
+            resultado.add(new DoctorInfo(fila.get("id").asText(), texto(fila, "nombre")));
+        }
+        return resultado;
+    }
+
     public static List<ResumenBorrador> listarReportes(SesionSupabase sesion) throws IOException, InterruptedException {
         HttpResponse<String> response = enviarConReintento(sesion, token -> HttpRequest.newBuilder()
                 .uri(URI.create(SUPABASE_URL + "/rest/v1/reportes?select=id,nombre,cedula,fecha,estado,fecha_date,doctor_id&order=updated_at.desc"))
