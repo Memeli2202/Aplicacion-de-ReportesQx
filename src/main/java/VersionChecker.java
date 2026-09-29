@@ -1,3 +1,6 @@
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import javax.swing.*;
 import java.awt.*;
 import java.io.IOException;
@@ -7,12 +10,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.time.LocalDateTime;
 
 /**
- * check GitHub for newer version.
+ * check GitHub for newer version
  *
  * How the actual install happens (a running app can't overwrite its own
  *  * files, so this can't be fully invisible):
@@ -25,10 +28,12 @@ import java.util.regex.Pattern;
 public class VersionChecker {
 
     //bump this by hand whenever you tag and publish a new release
-    public static final String CURRENT_VERSION = "1.2.5";
+    public static final String CURRENT_VERSION = "1.2.6";
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private static final String REPO = "Memeli2202/Aplicacion-de-ReportesQx"; // <-- update this
-    private static final String APP_NAME = "Doctor Helper"; // <-- must match jpackage --name
+    private static final String APP_NAME = "DesktopReportBuilder"; // <-- must match jpackage --name
     private static final String API_URL = "https://api.github.com/repos/" + REPO + "/releases/latest";
 
     private static class Asset {
@@ -64,17 +69,34 @@ public class VersionChecker {
                             .build();
                     HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
                     if (response.statusCode() != 200) {
+                        registrar("HTTP " + response.statusCode() + " al consultar " + API_URL
+                                + " - cuerpo: " + recortar(response.body()));
                         return null;
                     }
-                    String body = response.body();
-                    String ultimaVersion = extraerTagName(body);
-                    if (ultimaVersion == null || !esMasNueva(ultimaVersion, CURRENT_VERSION)) {
+                    JsonNode raiz = MAPPER.readTree(response.body());
+                    String ultimaVersion = extraerTagName(raiz);
+                    if (ultimaVersion == null) {
+                        registrar("No se pudo extraer tag_name del JSON de respuesta. Cuerpo: " + recortar(response.body()));
                         return null;
                     }
-                    asset = buscarAssetParaEstePlataforma(body);
+                    if (!esMasNueva(ultimaVersion, CURRENT_VERSION)) {
+                        registrar("Version remota (" + ultimaVersion + ") no es mas nueva que la version actual (" + CURRENT_VERSION + "). No hay actualizacion.");
+                        return null;
+                    }
+                    asset = buscarAssetParaEstePlataforma(raiz);
+                    if (asset == null) {
+                        registrar("Version remota (" + ultimaVersion + ") es mas nueva que " + CURRENT_VERSION
+                                + ", pero no se encontro un asset para esta plataforma (sufijo esperado: "
+                                + detectarSufijoDePlataforma() + "). Assets en el release: " + extraerNombresDeAssets(raiz));
+                        return null;
+                    }
+                    registrar("Actualizacion encontrada: " + ultimaVersion + " (actual: " + CURRENT_VERSION
+                            + "), asset: " + asset.nombre);
                     return ultimaVersion;
                 } catch (Exception ex) {
-                    //offline, DNS failure, GitHub down, rate-limited, etc. - fail silently
+                    //offline, DNS failure, GitHub down, rate-limited, etc. - fail silently to the user,
+                    //but still leave a trace in the log file so it can be diagnosed later
+                    registrar("Excepcion al verificar actualizacion: " + ex);
                     return null;
                 }
             }
@@ -86,11 +108,44 @@ public class VersionChecker {
                     if (ultimaVersion != null && asset != null) {
                         confirmarYDescargar(parent, ultimaVersion, asset);
                     }
-                } catch (Exception ignored) {
+                } catch (Exception ex) {
                     //never let a failed update check surface as an error to the user
+                    registrar("Excepcion inesperada en done(): " + ex);
                 }
             }
         }.execute();
+    }
+
+    /**
+     * TEMPORARY diagnostic logging so we can see exactly why an update
+     * alert isn't showing up, without needing a terminal attached to the
+     * packaged app. Writes to ~/.doctorhelper/update_check.log. Safe to
+     * remove once the root cause is confirmed.
+     */
+    private static void registrar(String mensaje) {
+        try {
+            Path carpeta = Path.of(System.getProperty("user.home"), ".doctorhelper");
+            Files.createDirectories(carpeta);
+            Path log = carpeta.resolve("update_check.log");
+            String linea = LocalDateTime.now() + " - " + mensaje + System.lineSeparator();
+            Files.writeString(log, linea, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (Exception ignored) {
+            //logging itself must never break the app
+        }
+    }
+
+    private static String extraerNombresDeAssets(JsonNode raiz) {
+        StringBuilder sb = new StringBuilder();
+        for (JsonNode assetNode : raiz.path("assets")) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(assetNode.path("name").asText());
+        }
+        return sb.toString();
+    }
+
+    private static String recortar(String texto) {
+        if (texto == null) return "null";
+        return texto.length() > 300 ? texto.substring(0, 300) + "..." : texto;
     }
 
     private static void confirmarYDescargar(Component parent, String nuevaVersion, Asset asset) {
@@ -210,9 +265,13 @@ public class VersionChecker {
         System.exit(0);
     }
 
-    private static String extraerTagName(String json) {
-        Matcher m = Pattern.compile("\"tag_name\"\\s*:\\s*\"v?([\\d.]+)\"").matcher(json);
-        return m.find() ? m.group(1) : null;
+    private static String extraerTagName(JsonNode raiz) {
+        String tag = raiz.path("tag_name").asText(null);
+        if (tag == null) {
+            return null;
+        }
+        //strip a leading "v" if present (tags are "v1.2.5", we just want "1.2.5")
+        return tag.startsWith("v") ? tag.substring(1) : tag;
     }
 
     private static boolean esMasNueva(String remota, String actual) {
@@ -235,21 +294,19 @@ public class VersionChecker {
      * "mac-applesilicon", or "mac-intel" - matching that workflow's
      * platform suffix convention.
      */
-    private static Asset buscarAssetParaEstePlataforma(String json) {
+    private static Asset buscarAssetParaEstePlataforma(JsonNode raiz) {
         String sufijo = detectarSufijoDePlataforma();
         if (sufijo == null) {
             return null;
         }
 
-        Matcher m = Pattern.compile(
-                "\"name\"\\s*:\\s*\"([^\"]+)\"[^}]*?\"browser_download_url\"\\s*:\\s*\"([^\"]+)\""
-        ).matcher(json);
-
-        while (m.find()) {
-            String nombreArchivo = m.group(1);
-            String url = m.group(2);
+        for (JsonNode assetNode : raiz.path("assets")) {
+            String nombreArchivo = assetNode.path("name").asText("");
             if (nombreArchivo.contains(sufijo)) {
-                return new Asset(nombreArchivo, url);
+                String url = assetNode.path("browser_download_url").asText(null);
+                if (url != null) {
+                    return new Asset(nombreArchivo, url);
+                }
             }
         }
         return null;
