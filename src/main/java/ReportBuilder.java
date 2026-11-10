@@ -763,7 +763,7 @@ public class ReportBuilder extends JFrame {
         panelDeContenido = new JPanel();
         panelDeContenido.setLayout(new GridLayoutManager(20, 6, new Insets(10, 0, 0, 0), -1, -1));
         panelDeContenido.setMinimumSize(new Dimension(500, 550));
-        panelDeContenido.setPreferredSize(new Dimension(650, 700));
+        panelDeContenido.setPreferredSize(new Dimension(750, 700));
         final JLabel label1 = new JLabel();
         label1.setText("Fecha (dd/mm/aaaa)");
         panelDeContenido.add(label1, new GridConstraints(1, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(138, 17), null, 0, false));

@@ -13,6 +13,7 @@ import com.itextpdf.kernel.pdf.event.*;
 import com.itextpdf.kernel.pdf.extgstate.PdfExtGState;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.borders.Border;
+import com.itextpdf.layout.borders.SolidBorder;
 import com.itextpdf.layout.element.*;
 import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.properties.HorizontalAlignment;
@@ -31,6 +32,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
@@ -40,6 +42,11 @@ public class PdfReportGenerator {
     private static final float LOGO_ANCHO = 200f;
     private static final float LOGO_OFFSET = 35f;
     private static final float HEADER_ALTO_APROX = 66f;
+    private static final float MARGEN_INFERIOR = 36f;
+    //how many trailing lines of the section right before the signature get
+    //held back to travel with it as one unit, so the signature never lands
+    //alone on an otherwise near-empty final page
+    private static final int LINEAS_RESERVADAS_FIRMA = 2;
 
     public static void generar(Reporte reporte, List<DialogoImagenes.ImagenComentario> imagenes, File destino,
                                ImageData logo, ImageData sello, ImageData marcaAgua) throws IOException {
@@ -49,7 +56,7 @@ public class PdfReportGenerator {
 
         try(Document documentoFinal = new Document(pdfDoc, PageSize.LETTER)){
 
-            documentoFinal.setMargins(40,40,36,40);
+            documentoFinal.setMargins(40,40,MARGEN_INFERIOR,40);
 
             if(logo != null) {
                 float altoLogo = LOGO_ANCHO * logo.getHeight() / logo.getWidth();
@@ -98,7 +105,7 @@ public class PdfReportGenerator {
 
             //adding images
             if(imagenes != null && !imagenes.isEmpty()) {
-                Table grid = new Table(UnitValue.createPercentArray(new float[]{1,1,1})).useAllAvailableWidth();
+                Table grid = new Table(UnitValue.createPercentArray(new float[]{1,1})).useAllAvailableWidth();
 
                 int numero = 1;
                 for(DialogoImagenes.ImagenComentario imagenYComentario : imagenes) {
@@ -111,16 +118,24 @@ public class PdfReportGenerator {
                     grid.addCell(celdaImagen);
                     numero++;
                 }
+                //with 2 columns, an odd number of images leaves the last row with
+                //only 1 of 2 cells filled - iText warns about that incomplete row
+                //("Last row is not completed") since border-collapsing on a short
+                //row is ambiguous. Pad it out with an empty, borderless cell.
+                if (imagenes.size() % 2 != 0) {
+                    grid.addCell(new Cell().setBorder(Border.NO_BORDER));
+                }
                 documentoFinal.add(grid);
-                documentoFinal.add(new Paragraph(" "));
-                documentoFinal.add(separador());
 
                 //comments for images if there are any
                 boolean hayComentarios = imagenes.stream().anyMatch(imagenComentario ->
                         imagenComentario.getComentario() != null && !imagenComentario.getComentario().trim().isEmpty());
 
                 if(hayComentarios) {
-                    documentoFinal.add(new Paragraph("Comentarios de las Imágenes: ").simulateBold().setFontSize(14));
+                    //the divider lives on this heading's own top border now (see
+                    //tituloSeccion), not as a standalone separador() before it,
+                    //so it can't be stranded if this heading gets pushed to a new page
+                    documentoFinal.add(tituloSeccion("Comentarios de las Imágenes: ").setKeepWithNext(true));
                     numero = 1;
                     for (DialogoImagenes.ImagenComentario imagenYComentario : imagenes) {
                         String comentario = imagenYComentario.getComentario();
@@ -128,35 +143,61 @@ public class PdfReportGenerator {
                             numero++;
                             continue;
                         }
-                        documentoFinal.add(new Paragraph("Imagen " + numero + ". ").simulateBold().setFontSize(12));
+                        documentoFinal.add(new Paragraph("Imagen " + numero + ". ").simulateBold().setFontSize(12).setKeepWithNext(true));
                         documentoFinal.add(new Paragraph(comentario).setTextAlignment(TextAlignment.JUSTIFIED).setFontSize(11));
                         numero++;
                     }
-                    documentoFinal.add(new Paragraph(" "));
-                    documentoFinal.add(separador());
                 }
+                //no standalone trailing separator here either way - whichever
+                //section comes next (resumen/enzian/post) carries its own
+                //leading divider via tituloSeccion()
 
             }
-
-            if(!safe(reporte.getResumenQx()).isBlank()) {
-                Div seccionResumen = new Div().setKeepTogether(true);
-                seccionResumen.add(new Paragraph("Comentarios del Procedimiento:").setFontSize(14).simulateBold());
-                seccionResumen.add(new Paragraph(safe(reporte.getResumenQx())).setTextAlignment(TextAlignment.JUSTIFIED).setFontSize(12));
-                seccionResumen.add(new Paragraph(" "));
-                seccionResumen.add(separador());
-                documentoFinal.add(seccionResumen);
-            }
-
 
             boolean hayEnzians = !safe(reporte.getEnzianA()).isBlank() || !safe(reporte.getEnzianB()).isBlank()
                     || !safe(reporte.getEnzianB2()).isBlank() || !safe(reporte.getEnzianC()).isBlank()
                     || !safe(reporte.getEnzianF()).isBlank() || !safe(reporte.getEnzianO()).isBlank()
                     || !safe(reporte.getEnzianO2()).isBlank() || !safe(reporte.getEnzianP()).isBlank()
                     || !safe(reporte.getEnzianT()).isBlank() || !safe(reporte.getEnzianT2()).isBlank();
+
+            //NOTE: resumenQx/postQx are intentionally rendered as individual
+            //line-paragraphs rather than one big Paragraph. resumenQx/postQx are
+            //free text with no length limit, so KeepTogether on the whole block
+            //made iText give up on it entirely once it got taller than a page
+            //(the "KeepTogether property will be ignored" warning) and dump a
+            //half-rendered chunk. Splitting into lines also lets us hold back
+            //the last couple of lines of whichever section sits right before
+            //the signature (see colaParaFirma below), so that text travels
+            //together with the signature instead of it landing alone on an
+            //otherwise near-empty final page.
+            List<Paragraph> parrafosResumen = safe(reporte.getResumenQx()).isBlank() ? null : parrafosDe(reporte.getResumenQx());
+            if (parrafosResumen != null && parrafosResumen.isEmpty()) parrafosResumen = null;
+            List<Paragraph> parrafosPost = safe(reporte.getPostQx()).isBlank() ? null : parrafosDe(reporte.getPostQx());
+            if (parrafosPost != null && parrafosPost.isEmpty()) parrafosPost = null;
+
+            //Whichever of post/enzian/resumen is physically LAST before the
+            //signature in the document's fixed order (post, then enzian, then
+            //resumen - rendered in that priority since post comes after enzian
+            //which comes after resumen) is the one that gets glued to it.
+            //Enzian can be "cola" too - a small bounded table can be held back
+            //as a whole unit just as easily as a couple of text lines can.
+            boolean postEsCola = sello != null && parrafosPost != null;
+            boolean enzianEsCola = sello != null && !postEsCola && hayEnzians;
+            boolean resumenEsCola = sello != null && !postEsCola && !enzianEsCola && parrafosResumen != null;
+
+            List<IBlockElement> colaParaFirma = new ArrayList<>();
+
+            if(parrafosResumen != null) {
+                renderSeccionTexto(documentoFinal, "Comentarios del Procedimiento:", parrafosResumen, resumenEsCola, colaParaFirma);
+            }
+
             if(hayEnzians ) {
-                //Enzian classification
-                Div seccionEnzian = new Div().setKeepTogether(true);
-                seccionEnzian.add(new Paragraph("Clasificación #enzian(s):").setFontSize(14).simulateBold());
+                //Enzian classification - small and bounded, so it always fits on
+                //one full page. The heading's own top border (tituloSeccion) is
+                //added right alongside the table, so wherever this ends up (its
+                //own page, or glued to the signature below), its divider travels
+                //with it instead of being left behind.
+                Paragraph encabezadoEnzian = tituloSeccion("Clasificación #enzian(s):");
                 Table enzian = new Table(UnitValue.createPercentArray(new float[]{1, 1, 1, 1, 1, 1, 1}))
                         .useAllAvailableWidth();
                 for (String columna : new String[]{"P", "O", "T", "A", "B", "C", "F"}) {
@@ -169,50 +210,63 @@ public class PdfReportGenerator {
                 enzian.addCell(celda(combinar(reporte.getEnzianB(), reporte.getEnzianB2())));
                 enzian.addCell(celda(safe(reporte.getEnzianC())));
                 enzian.addCell(celda(safe(reporte.getEnzianF())));
-                seccionEnzian.add(enzian);
-                seccionEnzian.add(new Paragraph(" "));
-                seccionEnzian.add(separador());
-                documentoFinal.add(seccionEnzian);
+
+                if (enzianEsCola) {
+                    //this is the section right before the signature - don't
+                    //render it on its own, queue it to be glued to the
+                    //signature block instead (see colaParaFirma below)
+                    colaParaFirma.add(encabezadoEnzian);
+                    colaParaFirma.add(enzian);
+                } else {
+                    Div seccionEnzian = new Div().setKeepTogether(true);
+                    seccionEnzian.add(encabezadoEnzian);
+                    seccionEnzian.add(enzian);
+                    documentoFinal.add(seccionEnzian);
+                }
             }
 
 
-            if(!safe(reporte.getPostQx()).isBlank()) {
-                Div seccionPost = new Div().setKeepTogether(true);
-                seccionPost.add(new Paragraph("Que esperar luego de mi Procedimiento:").setFontSize(14).simulateBold());
-                seccionPost.add(new Paragraph(safe(reporte.getPostQx())).setTextAlignment(TextAlignment.JUSTIFIED).setFontSize(12));
-                seccionPost.add(new Paragraph(" "));
-                documentoFinal.add(seccionPost);
+            if(parrafosPost != null) {
+                renderSeccionTexto(documentoFinal, "Que esperar luego de mi Procedimiento:", parrafosPost, postEsCola, colaParaFirma);
             }
 
-            //adding sello after everything else is generated
+            //adding sello after everything else is generated - as NORMAL
+            //flowing content now (not setFixedPosition), wrapped in its own
+            //KeepTogether Div just like the Enzian table above. This is what
+            //lets colaParaFirma (the held-back tail of whichever text section
+            //came right before it) be glued into the SAME atomic block: if it
+            //doesn't fit on the current page, the whole thing - real text and
+            //signature together - moves to a fresh page as one piece, so the
+            //signature never lands alone on an otherwise near-empty page.
             if(sello != null) {
-                float xIzquierda = 36f;
-                int totalPaginas = pdfDoc.getNumberOfPages();
+                //deliberately NOT width-constrained: colaParaFirma may contain
+                //held-back report-text lines that need the FULL page width to
+                //match the rest of the paragraph they were split from. The
+                //doctor-info lines below are short, plain (non-justified)
+                //paragraphs, so they hug their own natural width regardless.
+                Div bloqueFirma = new Div().setKeepTogether(true);
 
-
-                //doctor info
-                float anchoTexto = 210f;
-                float yTexto = 40f;
-                Div bloqueTexto = new Div();
-                bloqueTexto.setFixedPosition(totalPaginas, xIzquierda, yTexto, anchoTexto);
-                bloqueTexto.add(new Paragraph("DRA. MELANIE D. PORTER").simulateBold().setFontSize(11).setMargin(0));
-                bloqueTexto.add(new Paragraph("Gineco-Obstetra").setFontSize(8).setMargin(0));
-                bloqueTexto.add(new Paragraph("Reproducción Humana Asistida").setFontSize(8).setMargin(0));
-                bloqueTexto.add(new Paragraph("Laparo-Histeroscopía Avanzada").setFontSize(8).setMargin(0));
-                bloqueTexto.add(new Paragraph("Endometriosis Infiltrativa Profunda").setFontSize(8).setMargin(0));
-                documentoFinal.add(bloqueTexto);
+                for (IBlockElement elemento : colaParaFirma) {
+                    bloqueFirma.add(elemento);
+                }
+                if (!colaParaFirma.isEmpty()) {
+                    bloqueFirma.add(new Paragraph(" "));
+                }
 
                 float anchoSello = 156f;
                 float altoSello = anchoSello * sello.getHeight() / sello.getWidth();
-                float alturaTextoAprox = 70f;
-
-                float ySello = yTexto + alturaTextoAprox + 8;
                 Image selloImg = new Image(sello);
                 selloImg.scaleToFit(anchoSello, altoSello);
-                selloImg.setFixedPosition(totalPaginas, xIzquierda, ySello);
-                documentoFinal.add(selloImg);
+                selloImg.setMarginBottom(4f);
+                bloqueFirma.add(selloImg);
 
+                bloqueFirma.add(new Paragraph("DRA. MELANIE D. PORTER").simulateBold().setFontSize(11).setMargin(0));
+                bloqueFirma.add(new Paragraph("Gineco-Obstetra").setFontSize(8).setMargin(0));
+                bloqueFirma.add(new Paragraph("Reproducción Humana Asistida").setFontSize(8).setMargin(0));
+                bloqueFirma.add(new Paragraph("Laparo-Histeroscopía Avanzada").setFontSize(8).setMargin(0));
+                bloqueFirma.add(new Paragraph("Endometriosis Infiltrativa Profunda").setFontSize(8).setMargin(0));
 
+                documentoFinal.add(bloqueFirma);
             }
 
 
@@ -341,6 +395,96 @@ public class PdfReportGenerator {
 
     private static LineSeparator separador(){
         return new LineSeparator(new SolidLine());
+    }
+
+    /**
+     * Splits free text (resumenQx/postQx) into one Paragraph per non-blank
+     * line, instead of a single Paragraph with embedded \n line breaks.
+     * Visually identical (each segment is still its own left-anchored,
+     * justified block), but being separate elements lets the caller hold
+     * back just the last few lines to travel with the signature block
+     * (see renderSeccionTexto) instead of either forcing the WHOLE section
+     * to stay together (breaks on long text) or leaving the signature to
+     * land alone wherever the text happens to end.
+     */
+    private static List<Paragraph> parrafosDe(String texto) {
+        List<Paragraph> parrafos = new ArrayList<>();
+        boolean lineaAnteriorEnBlanco = false;
+        boolean esPrimeraLinea = true;
+        for (String linea : safe(texto).split("\n")) {
+            if (linea.isBlank()) {
+                lineaAnteriorEnBlanco = true;
+                continue;
+            }
+            Paragraph p = new Paragraph(linea).setTextAlignment(TextAlignment.JUSTIFIED).setFontSize(12).setMargin(0);
+            if (lineaAnteriorEnBlanco && !esPrimeraLinea) {
+                //the doctor left a blank line here on purpose to mark a new
+                //paragraph - preserve that as real spacing instead of
+                //silently collapsing it, which made every paragraph look
+                //like it was stuck to the next one
+                p.setMarginTop(8f);
+            }
+            parrafos.add(p);
+            lineaAnteriorEnBlanco = false;
+            esPrimeraLinea = false;
+        }
+        return parrafos;
+    }
+
+    /**
+     * Renders a free-text section's heading + line-paragraphs. When
+     * esCola is true (this section sits right before the signature),
+     * the last LINEAS_RESERVADAS_FIRMA lines are NOT rendered here -
+     * they're appended to colaParaFirma instead, to be glued to the
+     * signature as one KeepTogether unit by the caller. If the section
+     * is short enough that holding back that many lines would leave
+     * nothing meaningful in normal flow, the heading itself is deferred
+     * along with the whole body instead of being stranded alone.
+     */
+    private static void renderSeccionTexto(Document documentoFinal, String encabezado, List<Paragraph> parrafos,
+                                           boolean esCola, List<IBlockElement> colaParaFirma) {
+        int limite = esCola ? Math.max(0, parrafos.size() - LINEAS_RESERVADAS_FIRMA) : parrafos.size();
+
+        if (limite > 0) {
+            documentoFinal.add(tituloSeccion(encabezado).setKeepWithNext(true));
+            for (int i = 0; i < limite; i++) {
+                documentoFinal.add(parrafos.get(i));
+            }
+            documentoFinal.add(new Paragraph(" "));
+        }
+
+        if (esCola) {
+            if (limite == 0) {
+                colaParaFirma.add(tituloSeccion(encabezado).setKeepWithNext(true));
+            }
+            for (int i = limite; i < parrafos.size(); i++) {
+                colaParaFirma.add(parrafos.get(i));
+            }
+        }
+    }
+
+    /**
+     * A section heading with its divider line attached as a top border,
+     * instead of a separate standalone LineSeparator element placed before it.
+     *
+     * Why: a standalone separador() added at the END of the previous section
+     * is a completely independent element. If the section that follows it
+     * can't fit on the remaining space of the page and gets pushed whole to
+     * the next page (KeepTogether) or held back by KeepWithNext, the
+     * separator - which isn't part of that relocated group - stays behind,
+     * stranded on the previous page with nothing under it but blank space.
+     * By making the line part of the heading's own box (a border), the line
+     * can never be separated from its heading: wherever the heading ends up,
+     * the divider goes with it.
+     */
+    private static Paragraph tituloSeccion(String texto) {
+        return new Paragraph(texto)
+                .simulateBold()
+                .setFontSize(14)
+                .setBorderTop(new SolidBorder(ColorConstants.BLACK, 0.75f))
+                .setPaddingTop(10f)
+                .setMarginTop(14f)
+                .setMarginBottom(6f);
     }
 
     private static Cell celda(String texto){

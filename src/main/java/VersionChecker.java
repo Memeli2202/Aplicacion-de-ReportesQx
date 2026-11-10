@@ -28,7 +28,7 @@ import java.time.LocalDateTime;
 public class VersionChecker {
 
     //bump this by hand whenever you tag and publish a new release
-    public static final String CURRENT_VERSION = "1.2.6";
+    public static final String CURRENT_VERSION = "1.2.7";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
