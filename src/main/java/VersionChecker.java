@@ -13,27 +13,37 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 /**
- * check GitHub for newer version
+ * Checks GitHub for a newer version and, if the user agrees, installs it
+ * by itself and reopens the app - the user never sees an installer.
  *
- * How the actual install happens (a running app can't overwrite its own
- *  * files, so this can't be fully invisible):
- *  *   1. Download the installer to a temp file.
- *  *   2. Write a tiny helper script that waits a couple seconds (giving this
- *  *      JVM time to fully exit), then runs the installer silently.
- *  *   3. Launch that helper script as an independent process, then exit.
+ * How the install happens (a running app can't overwrite its own files):
+ *   1. Download the new installer (.msi on Windows, .dmg on macOS) to a temp file.
+ *   2. Write a tiny helper script that waits until THIS process has exited,
+ *      installs the update silently, then reopens the app.
+ *   3. Launch that script as an independent process and exit.
  *
+ * Windows: msiexec /passive shows only a small progress bar, no clicks. If the
+ *   app was installed for all users (Program Files), Windows asks for admin
+ *   permission once (UAC). Build with --win-per-user-install to avoid that.
+ *   The MSI must be built with a fixed --win-upgrade-uuid so it replaces the
+ *   old version instead of installing a second copy.
+ * macOS: the new .app is copied over the current one with ditto, which keeps
+ *   the signature and notarization intact. If the app's folder isn't writable
+ *   by this user, the .dmg is opened instead so they can drag it in.
  */
 public class VersionChecker {
 
     //bump this by hand whenever you tag and publish a new release
-    public static final String CURRENT_VERSION = "1.2.8";
+    public static final String CURRENT_VERSION = "1.2.9";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private static final String REPO = "Memeli2202/Aplicacion-de-ReportesQx"; // <-- update this
-    private static final String APP_NAME = "DesktopReportBuilder"; // <-- must match jpackage --name
+    //Public repo that holds ONLY the installers (no code). The code repo stays private;
+    //the CI workflow publishes each release here. Must be public so this check needs no token.
+    private static final String REPO = "Memeli2202/DoctorHelper-Releases";
     private static final String API_URL = "https://api.github.com/repos/" + REPO + "/releases/latest";
 
     private static class Asset {
@@ -60,6 +70,7 @@ public class VersionChecker {
                 try {
                     HttpClient client = HttpClient.newBuilder()
                             .connectTimeout(Duration.ofSeconds(5))
+                            .followRedirects(HttpClient.Redirect.NORMAL)
                             .build();
                     HttpRequest request = HttpRequest.newBuilder()
                             .uri(URI.create(API_URL))
@@ -106,7 +117,7 @@ public class VersionChecker {
                 try {
                     String ultimaVersion = get();
                     if (ultimaVersion != null && asset != null) {
-                        confirmarYDescargar(parent, ultimaVersion, asset);
+                        confirmarEInstalar(parent, ultimaVersion, asset);
                     }
                 } catch (Exception ex) {
                     //never let a failed update check surface as an error to the user
@@ -117,21 +128,23 @@ public class VersionChecker {
     }
 
     /**
-     * TEMPORARY diagnostic logging so we can see exactly why an update
-     * alert isn't showing up, without needing a terminal attached to the
-     * packaged app. Writes to ~/.doctorhelper/update_check.log. Safe to
-     * remove once the root cause is confirmed.
+     * Writes to ~/.doctorhelper/update_check.log so a failed check or install
+     * can be diagnosed without a terminal attached to the packaged app.
      */
     private static void registrar(String mensaje) {
         try {
-            Path carpeta = Path.of(System.getProperty("user.home"), ".doctorhelper");
-            Files.createDirectories(carpeta);
-            Path log = carpeta.resolve("update_check.log");
+            Path log = carpetaDeLogs().resolve("update_check.log");
             String linea = LocalDateTime.now() + " - " + mensaje + System.lineSeparator();
             Files.writeString(log, linea, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (Exception ignored) {
             //logging itself must never break the app
         }
+    }
+
+    private static Path carpetaDeLogs() throws IOException {
+        Path carpeta = Path.of(System.getProperty("user.home"), ".doctorhelper");
+        Files.createDirectories(carpeta);
+        return carpeta;
     }
 
     private static String extraerNombresDeAssets(JsonNode raiz) {
@@ -148,9 +161,12 @@ public class VersionChecker {
         return texto.length() > 300 ? texto.substring(0, 300) + "..." : texto;
     }
 
-    private static void confirmarYDescargar(Component parent, String nuevaVersion, Asset asset) {
+    /** One question, then everything else happens by itself. */
+    private static void confirmarEInstalar(Component parent, String nuevaVersion, Asset asset) {
         int opcion = JOptionPane.showConfirmDialog(parent,
-                "Hay una nueva versión disponible (" + nuevaVersion + ").\n¿Deseas descargarla ahora?",
+                "Hay una nueva versión disponible (" + nuevaVersion + ").\n"
+                        + "¿Actualizar ahora? La aplicación se cerrará y se volverá a abrir sola.\n"
+                        + "Guarda tu trabajo antes de continuar.",
                 "Actualización disponible",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.INFORMATION_MESSAGE);
@@ -179,22 +195,18 @@ public class VersionChecker {
                 progreso.dispose();
 
                 if (error != null) {
+                    registrar("Fallo la descarga: " + error);
                     JOptionPane.showMessageDialog(parent, "No se pudo descargar la actualización: " + error.getMessage(),
                             "Error", JOptionPane.ERROR_MESSAGE);
                     return;
                 }
 
                 try {
-                    Path archivo = get();
-                    int reiniciar = JOptionPane.showConfirmDialog(parent,
-                            "Actualización lista. ¿Reiniciar ahora para instalarla?",
-                            "Actualización lista",
-                            JOptionPane.YES_NO_OPTION,
-                            JOptionPane.INFORMATION_MESSAGE);
-                    if (reiniciar == JOptionPane.YES_OPTION) {
-                        aplicarActualizacion(archivo);
-                    }
-                } catch (Exception ignored) {
+                    aplicarActualizacion(get());
+                } catch (Exception ex) {
+                    registrar("Fallo al aplicar la actualizacion: " + ex);
+                    JOptionPane.showMessageDialog(parent, "No se pudo instalar la actualización: " + ex.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
                 }
             }
         };
@@ -205,62 +217,144 @@ public class VersionChecker {
 
     private static Path descargarArchivo(Asset asset) throws IOException, InterruptedException {
         Path destino = Files.createTempFile("update_", "_" + asset.nombre);
-        HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        //GitHub download links redirect to a CDN, so redirects must be followed
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(asset.url))
                 .timeout(Duration.ofMinutes(5)) //installers can be sizable
                 .GET()
                 .build();
-        client.send(request, HttpResponse.BodyHandlers.ofFile(destino));
+        HttpResponse<Path> respuesta = client.send(request, HttpResponse.BodyHandlers.ofFile(destino));
+        if (respuesta.statusCode() != 200 || Files.size(destino) < 1_000_000) {
+            throw new IOException("descarga incompleta (HTTP " + respuesta.statusCode() + ")");
+        }
         return destino;
     }
 
     /**
-     * Writes and launches a small helper script that waits for this JVM to
-     * fully exit, then installs the update - a running app can't safely
-     * overwrite its own currently-loaded files, so this indirection is
-     * necessary on both platforms.
+     * Path of the running app's own launcher (e.g. C:\...\DesktopReportBuilder.exe or
+     * /Applications/DesktopReportBuilder.app/Contents/MacOS/DesktopReportBuilder).
+     * Empty when running from an IDE / plain "java", where self-updating makes no sense.
      */
-    private static void aplicarActualizacion(Path archivoDescargado) {
-        try {
-            String osName = System.getProperty("os.name", "").toLowerCase();
-            if (osName.contains("win")) {
-                aplicarActualizacionWindows(archivoDescargado);
-            } else if (osName.contains("mac")) {
-                aplicarActualizacionMac(archivoDescargado);
-            } else {
-                JOptionPane.showMessageDialog(null, "Actualización automática no disponible para este sistema operativo.");
-            }
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(null, "No se pudo iniciar la actualización: " + ex.getMessage(),
-                    "Error", JOptionPane.ERROR_MESSAGE);
+    private static Optional<Path> lanzadorActual() {
+        Optional<String> comando = ProcessHandle.current().info().command();
+        if (comando.isEmpty()) {
+            return Optional.empty();
+        }
+        Path ruta = Path.of(comando.get());
+        String nombre = ruta.getFileName().toString().toLowerCase();
+        if (nombre.equals("java") || nombre.equals("java.exe") || nombre.equals("javaw.exe")) {
+            return Optional.empty();
+        }
+        return Optional.of(ruta);
+    }
+
+    private static void aplicarActualizacion(Path archivoDescargado) throws IOException {
+        String osName = System.getProperty("os.name", "").toLowerCase();
+        Optional<Path> lanzador = lanzadorActual();
+        if (lanzador.isEmpty()) {
+            //not a packaged install (e.g. running from the IDE): just hand over the installer
+            registrar("No es una instalacion empaquetada; se abre el instalador manualmente.");
+            Desktop.getDesktop().open(archivoDescargado.toFile());
+            return;
+        }
+
+        if (osName.contains("win")) {
+            aplicarActualizacionWindows(archivoDescargado, lanzador.get());
+        } else if (osName.contains("mac")) {
+            aplicarActualizacionMac(archivoDescargado, lanzador.get());
+        } else {
+            JOptionPane.showMessageDialog(null, "Actualización automática no disponible para este sistema operativo.");
         }
     }
 
-    private static void aplicarActualizacionWindows(Path instalador) throws IOException {
+    private static void aplicarActualizacionWindows(Path instalador, Path lanzador) throws IOException {
+        long pid = ProcessHandle.current().pid();
+        Path logInstalacion = carpetaDeLogs().resolve("update_install.log");
+        String nombre = instalador.getFileName().toString().toLowerCase();
+
+        String instalar;
+        if (nombre.endsWith(".msi")) {
+            //silent: only a small progress bar, no wizard; UAC prompt only if installed for all users
+            instalar = "start \"\" /wait msiexec /i \"" + instalador.toAbsolutePath() + "\" /passive /norestart /l*v \""
+                    + logInstalacion + "\"\r\n";
+        } else {
+            //older releases only had the .exe wizard - run it normally as a fallback
+            instalar = "start \"\" /wait \"" + instalador.toAbsolutePath() + "\"\r\n";
+        }
+
         Path script = Files.createTempFile("actualizar_", ".bat");
         String contenido = "@echo off\r\n"
-                + "timeout /t 2 /nobreak >nul\r\n"
-                + "\"" + instalador.toAbsolutePath() + "\" /quiet\r\n";
+                //wait until this app has really exited, so its files can be replaced
+                + ":esperar\r\n"
+                + "tasklist /FI \"PID eq " + pid + "\" 2>nul | find \"" + pid + "\" >nul\r\n"
+                + "if not errorlevel 1 (\r\n"
+                + "  timeout /t 1 /nobreak >nul\r\n"
+                + "  goto esperar\r\n"
+                + ")\r\n"
+                + instalar
+                + "start \"\" \"" + lanzador.toAbsolutePath() + "\"\r\n"
+                + "del \"" + instalador.toAbsolutePath() + "\" >nul 2>&1\r\n"
+                + "(goto) 2>nul & del \"%~f0\"\r\n";
         Files.writeString(script, contenido);
 
-        new ProcessBuilder("cmd", "/c", "start", "", script.toAbsolutePath().toString()).start();
+        registrar("Instalando actualizacion en Windows con " + instalador.getFileName() + ", reabriendo " + lanzador);
+        new ProcessBuilder("cmd", "/c", "start", "", "/min", script.toAbsolutePath().toString()).start();
         System.exit(0);
     }
 
-    private static void aplicarActualizacionMac(Path dmg) throws IOException {
+    private static void aplicarActualizacionMac(Path dmg, Path lanzador) throws IOException {
+        //.../DesktopReportBuilder.app/Contents/MacOS/DesktopReportBuilder -> .../DesktopReportBuilder.app
+        Path app = lanzador.getParent().getParent().getParent();
+        if (!app.getFileName().toString().endsWith(".app")) {
+            throw new IOException("no se encontró la aplicación instalada en " + lanzador);
+        }
+        Path carpetaApp = app.getParent();
+
+        if (!Files.isWritable(carpetaApp) || !Files.isWritable(app)) {
+            //this user can't replace the app (e.g. installed by another admin): open the .dmg instead
+            registrar("Sin permiso de escritura en " + carpetaApp + "; se abre el .dmg para instalar a mano.");
+            Desktop.getDesktop().open(dmg.toFile());
+            JOptionPane.showMessageDialog(null,
+                    "Arrastra la aplicación a la carpeta Aplicaciones para terminar la actualización.",
+                    "Actualización", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        long pid = ProcessHandle.current().pid();
+        Path log = carpetaDeLogs().resolve("update_install.log");
+        String nombreApp = app.getFileName().toString();
         Path script = Files.createTempFile("actualizar_", ".sh");
         String contenido = "#!/bin/bash\n"
-                + "sleep 2\n"
-                + "MOUNT_DIR=$(hdiutil attach \"" + dmg.toAbsolutePath() + "\" -nobrowse -noautoopen | tail -1 | awk '{print $NF}')\n"
-                + "rm -rf \"/Applications/" + APP_NAME + ".app\"\n"
-                + "cp -R \"$MOUNT_DIR/" + APP_NAME + ".app\" /Applications/\n"
-                + "hdiutil detach \"$MOUNT_DIR\" -quiet\n"
-                + "open \"/Applications/" + APP_NAME + ".app\"\n";
+                + "exec >>\"" + log + "\" 2>&1\n"
+                + "echo \"$(date) - instalando actualizacion\"\n"
+                //wait until this app has really exited
+                + "while kill -0 " + pid + " 2>/dev/null; do sleep 0.5; done\n"
+                + "MONTAJE=$(mktemp -d /tmp/doctorhelper_update.XXXXXX)\n"
+                + "hdiutil attach \"" + dmg.toAbsolutePath() + "\" -nobrowse -noautoopen -mountpoint \"$MONTAJE\" || exit 1\n"
+                + "NUEVA=\"$MONTAJE/" + nombreApp + "\"\n"
+                + "if [ ! -d \"$NUEVA\" ]; then NUEVA=$(ls -d \"$MONTAJE\"/*.app | head -1); fi\n"
+                + "if [ -d \"$NUEVA\" ]; then\n"
+                //copy to a temp name first, then swap: never leave the doctor with no app if the copy fails
+                + "  rm -rf \"" + app + ".nueva\"\n"
+                + "  if ditto \"$NUEVA\" \"" + app + ".nueva\"; then\n"
+                + "    rm -rf \"" + app + "\"\n"
+                + "    mv \"" + app + ".nueva\" \"" + app + "\"\n"
+                + "  fi\n"
+                + "fi\n"
+                + "hdiutil detach \"$MONTAJE\" -quiet\n"
+                + "rmdir \"$MONTAJE\"\n"
+                + "rm -f \"" + dmg.toAbsolutePath() + "\"\n"
+                + "open \"" + app + "\"\n"
+                + "rm -f \"$0\"\n";
         Files.writeString(script, contenido);
         //noinspection ResultOfMethodCallIgnored
         script.toFile().setExecutable(true);
 
+        registrar("Instalando actualizacion en macOS desde " + dmg.getFileName() + " sobre " + app);
         new ProcessBuilder("/bin/bash", script.toAbsolutePath().toString()).start();
         System.exit(0);
     }
@@ -291,8 +385,8 @@ public class VersionChecker {
     /**
      * Matches release asset filenames against this JVM's OS/architecture.
      * Expects filenames built by the CI workflow to contain "windows",
-     * "mac-applesilicon", or "mac-intel" - matching that workflow's
-     * platform suffix convention.
+     * "mac-applesilicon", or "mac-intel". On Windows the .msi is preferred
+     * (it can install silently); the .exe is only a fallback.
      */
     private static Asset buscarAssetParaEstePlataforma(JsonNode raiz) {
         String sufijo = detectarSufijoDePlataforma();
@@ -300,16 +394,22 @@ public class VersionChecker {
             return null;
         }
 
+        Asset alternativa = null;
         for (JsonNode assetNode : raiz.path("assets")) {
             String nombreArchivo = assetNode.path("name").asText("");
-            if (nombreArchivo.contains(sufijo)) {
-                String url = assetNode.path("browser_download_url").asText(null);
-                if (url != null) {
-                    return new Asset(nombreArchivo, url);
-                }
+            String url = assetNode.path("browser_download_url").asText(null);
+            if (!nombreArchivo.contains(sufijo) || url == null) {
+                continue;
+            }
+            String minusculas = nombreArchivo.toLowerCase();
+            if (minusculas.endsWith(".msi") || minusculas.endsWith(".dmg")) {
+                return new Asset(nombreArchivo, url);
+            }
+            if (alternativa == null && minusculas.endsWith(".exe")) {
+                alternativa = new Asset(nombreArchivo, url);
             }
         }
-        return null;
+        return alternativa;
     }
 
     private static String detectarSufijoDePlataforma() {
