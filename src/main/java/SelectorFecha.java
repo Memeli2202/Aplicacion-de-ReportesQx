@@ -46,7 +46,9 @@ public class SelectorFecha {
         popup.setModal(false);
 
         LocalDate inicial = parsear(campo.getText());
-        YearMonth[] mesActual = {YearMonth.from(inicial != null ? inicial : LocalDate.now())};
+        LocalDate hoy = LocalDate.now();
+        LocalDate preseleccionada = inicial != null ? inicial : hoy;
+        YearMonth[] mesActual = {YearMonth.from(preseleccionada)};
 
         JPanel panel = new JPanel(new BorderLayout(4, 4));
         panel.setBorder(BorderFactory.createLineBorder(Color.GRAY));
@@ -95,6 +97,22 @@ public class SelectorFecha {
                 JButton boton = new JButton(String.valueOf(dia));
                 boton.setMargin(new Insets(2, 2, 2, 2));
                 boton.setFocusPainted(false);
+
+                //preselect: the date already in the field, or today if the field is empty.
+                //(filled background drawn explicitly so it also shows on look-and-feels
+                //that ignore a plain setBackground on buttons)
+                LocalDate fechaDelBoton = mesActual[0].atDay(dia);
+                if (fechaDelBoton.equals(preseleccionada)) {
+                    boton.setContentAreaFilled(false);
+                    boton.setOpaque(true);
+                    boton.setBackground(new Color(0x2F6FDE));
+                    boton.setForeground(Color.WHITE);
+                    boton.setFont(boton.getFont().deriveFont(Font.BOLD));
+                } else if (fechaDelBoton.equals(hoy)) {
+                    //today stays marked even when another date is the selected one
+                    boton.setBorder(BorderFactory.createLineBorder(new Color(0x2F6FDE), 2));
+                    boton.setFont(boton.getFont().deriveFont(Font.BOLD));
+                }
                 boton.addActionListener(e -> {
                     LocalDate seleccionada = mesActual[0].atDay(diaFinal);
                     campo.setText(seleccionada.format(FORMATO));

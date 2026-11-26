@@ -5,6 +5,7 @@ import com.itextpdf.io.image.ImageData;
 import com.itextpdf.io.image.ImageDataFactory;
 
 import javax.swing.*;
+import javax.swing.text.AbstractDocument;
 import javax.swing.text.JTextComponent;
 import java.awt.*;
 import java.awt.event.*;
@@ -56,12 +57,98 @@ public class ReportBuilder extends JFrame {
     private List<SupabaseReportesClient.DoctorInfo> listaDoctores;
     private boolean cargadoDesdeBorrador = false;
     private ActivosAppClient.Activos activosCache;
+    private BuscadorPacientes buscadorPacientes;
+    private JComboBox<String> comboTipoDocumento;
+    private boolean ajustandoTipoDocumento = false;
 
     private ActivosAppClient.Activos obtenerActivos() throws IOException, InterruptedException {
         if (activosCache == null || activosCache.logo == null || activosCache.sello == null || activosCache.marcaAgua == null) {
             activosCache = ActivosAppClient.cargarActivos(sesion);
         }
         return activosCache;
+    }
+
+    /**
+     * A JTextPane inside a JScrollPane reports a preferred size that grows
+     * with its text (very wide or very tall), and the form's layout reads
+     * that every time it re-validates - e.g. when the progress/confirmation
+     * dialogs close after generating or saving. That made the whole form
+     * stretch or shift once the big text areas had content. Freezing each
+     * scroll pane at its current (empty) preferred size keeps the startup
+     * look exactly as it was and makes the layout independent of the text.
+     * Done in code rather than the .form so it survives regenerating the UI.
+     */
+    private static void fijarTamanoDeAreasDeTexto(JComponent... areas) {
+        for (JComponent area : areas) {
+            Container scroll = SwingUtilities.getAncestorOfClass(JScrollPane.class, area);
+            if (scroll != null) {
+                scroll.setPreferredSize(scroll.getPreferredSize());
+            }
+        }
+    }
+
+    /**
+     * Turns the "Cédula" label into a Cédula / Pasaporte selector and makes the
+     * document field format itself while typing: a cedula only accepts digits
+     * and adds the dashes (000-0000000-0) on its own, a passport accepts
+     * letters and digits in capitals. What gets saved is always without
+     * formatting (see documentoSinFormato); the dashes come back when shown.
+     * Done in code, so the .form file is untouched.
+     */
+    private void instalarSelectorDeDocumento() {
+        JLabel etiqueta = null;
+        for (Component c : panelDeContenido.getComponents()) {
+            if (c instanceof JLabel l && "Cédula".equals(l.getText())) {
+                etiqueta = l;
+                break;
+            }
+        }
+        if (etiqueta == null) {
+            return;
+        }
+
+        comboTipoDocumento = new JComboBox<>(new String[]{"Cédula", "Pasaporte"});
+        panelDeContenido.remove(etiqueta);
+        panelDeContenido.add(comboTipoDocumento, new GridConstraints(4, 1, 1, 1,
+                GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE,
+                GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED,
+                null, new Dimension(138, -1), null, 0, false));
+
+        comboTipoDocumento.addActionListener(e -> {
+            if (ajustandoTipoDocumento) {
+                return;
+            }
+            //the doctor changed the type: run the text through the filter again under the new
+            //rules, and the report no longer belongs to the previously picked patient
+            buscadorPacientes.sinBusqueda(() -> cedula.setText(cedula.getText()));
+            reporte.setPacienteId(null);
+        });
+
+        ((AbstractDocument) cedula.getDocument()).setDocumentFilter(new FiltroDocumento(cedula, this::tipoDocumentoSeleccionado));
+    }
+
+    private String tipoDocumentoSeleccionado() {
+        return comboTipoDocumento != null && comboTipoDocumento.getSelectedIndex() == 1
+                ? Documento.PASAPORTE : Documento.CEDULA;
+    }
+
+    private void setTipoDocumento(String tipo) {
+        if (comboTipoDocumento == null) {
+            return;
+        }
+        ajustandoTipoDocumento = true;
+        try {
+            comboTipoDocumento.setSelectedIndex(Documento.PASAPORTE.equals(tipo) ? 1 : 0);
+        } finally {
+            ajustandoTipoDocumento = false;
+        }
+    }
+
+    /**
+     * The document exactly as it is saved: no dashes or spaces.
+     */
+    private String documentoSinFormato() {
+        return Documento.paraGuardar(tipoDocumentoSeleccionado(), cedula.getText());
     }
 
     private static ImageData cargarImagenDeRecursos(String ruta) {
@@ -85,6 +172,17 @@ public class ReportBuilder extends JFrame {
         reporte = new Reporte();
 
         $$$setupUI$$$();
+        fijarTamanoDeAreasDeTexto(resumenQx, postCirugia);
+        instalarSelectorDeDocumento();
+
+        //suggests existing patients while typing a name or document (cedula/passport); picking one
+        //links the report to that patient's UID, typing a different document drops the link
+        buscadorPacientes = new BuscadorPacientes(sesion, nombrePaciente, cedula,
+                paciente -> {
+                    setTipoDocumento(paciente.tipoDocumento);
+                    reporte.setPacienteId(paciente.id);
+                },
+                () -> reporte.setPacienteId(null));
         setTitle("Crear Nuevo Reporte");
         setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
 
@@ -172,6 +270,10 @@ public class ReportBuilder extends JFrame {
         //set the frame visible
         setVisible(true);
 
+        //avisa al doctor si alguno de sus pacientes tiene una cédula mal escrita
+        //(marcada como pasaporte por la migración) y le deja corregirla
+        CorreccionDocumentos.revisarAlIniciar(this, sesion);
+
         //prevents the text being highlighted when switching back to the app
         addWindowFocusListener(new WindowAdapter() {
             @Override
@@ -200,7 +302,8 @@ public class ReportBuilder extends JFrame {
         actualizarDoctorAsignado();
         reporte.setNombre(nombrePaciente.getText());
         reporte.setEdad(edadPaciente.getText());
-        reporte.setCedula(cedula.getText());
+        reporte.setCedula(documentoSinFormato());
+        reporte.setTipoDocumento(tipoDocumentoSeleccionado());
         reporte.setArs(ars.getText());
         reporte.setProcedimiento(nombreProcedimiento.getText());
         reporte.setEnzianP(enzianP.getText());
@@ -272,7 +375,8 @@ public class ReportBuilder extends JFrame {
         actualizarDoctorAsignado();
         reporte.setNombre(nombrePaciente.getText());
         reporte.setEdad(edadPaciente.getText());
-        reporte.setCedula(cedula.getText());
+        reporte.setCedula(documentoSinFormato());
+        reporte.setTipoDocumento(tipoDocumentoSeleccionado());
         reporte.setArs(ars.getText());
         reporte.setProcedimiento(nombreProcedimiento.getText());
         reporte.setEnzianP(enzianP.getText());
@@ -400,8 +504,8 @@ public class ReportBuilder extends JFrame {
 
                     if (sesion.esAdmin()) {
                         nombresPorDoctorId = new HashMap<>();
-                        for (SupabaseReportesClient.DoctorInfo doctor : SupabaseReportesClient.listarDoctores(sesion)) {
-                            nombresPorDoctorId.put(doctor.id, doctor.nombre);
+                        for (SupabaseReportesClient.DoctorInfo perfil : SupabaseReportesClient.listarTodosLosPerfiles(sesion)) {
+                            nombresPorDoctorId.put(perfil.id, perfil.nombre);
                         }
                     }
 
@@ -555,9 +659,12 @@ public class ReportBuilder extends JFrame {
         seleccionarDoctorEnCombo(cargado.getDoctorId());
 
         fecha.setText(safe(cargado.getFecha()));
-        nombrePaciente.setText(safe(cargado.getNombre()));
+        buscadorPacientes.sinBusqueda(() -> {
+            setTipoDocumento(cargado.getTipoDocumento()); //before the text, which is formatted according to the type
+            nombrePaciente.setText(safe(cargado.getNombre()));
+            cedula.setText(safe(cargado.getCedula()));
+        });
         edadPaciente.setText(safe(cargado.getEdad()));
-        cedula.setText(safe(cargado.getCedula()));
         ars.setText(safe(cargado.getArs()));
         nombreProcedimiento.setText(safe(cargado.getProcedimiento()));
         enzianP.setText(safe(cargado.getEnzianP()));
@@ -599,7 +706,8 @@ public class ReportBuilder extends JFrame {
         actualizarDoctorAsignado();
         reporte.setNombre(nombrePaciente.getText());
         reporte.setEdad(edadPaciente.getText());
-        reporte.setCedula(cedula.getText());
+        reporte.setCedula(documentoSinFormato());
+        reporte.setTipoDocumento(tipoDocumentoSeleccionado());
         reporte.setArs(ars.getText());
         reporte.setProcedimiento(nombreProcedimiento.getText());
         reporte.setEnzianP(enzianP.getText());
@@ -689,21 +797,33 @@ public class ReportBuilder extends JFrame {
      * Clears all the information that has been filled so that a new report can be created
      */
     private void nuevoReporte() {
-        int confirmacion = JOptionPane.showConfirmDialog(panelDeContenido,
-                "¿Desea crear un nuevo reporte? Se perderán los datos sin guardar.",
-                "Nuevo Reporte", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        //"Mismo paciente" starts a brand-new report (new row, never overwrites the
+        //previous one) but keeps the patient's identifying data, so a patient can
+        //have as many reports as they have procedures without retyping anything
+        Object[] opciones = {"En blanco", "Mismo paciente", "Cancelar"};
+        int eleccion = JOptionPane.showOptionDialog(panelDeContenido,
+                "¿Desea crear un nuevo reporte? Se perderán los datos sin guardar.\n\n"
+                        + "\"Mismo paciente\" conserva nombre, edad, cédula y ARS.",
+                "Nuevo Reporte", JOptionPane.DEFAULT_OPTION, JOptionPane.WARNING_MESSAGE, null, opciones, opciones[0]);
 
-        if (confirmacion != JOptionPane.YES_OPTION) {
+        if (eleccion != 0 && eleccion != 1) {
             return;
         }
+        boolean mismoPaciente = (eleccion == 1);
+        String pacienteConservado = mismoPaciente ? reporte.getPacienteId() : null;
 
         seleccionarDoctorEnCombo(sesion.userId);
         fecha.setText("");
         nombreProcedimiento.setText("");
-        nombrePaciente.setText("");
-        edadPaciente.setText("");
-        cedula.setText("");
-        ars.setText("");
+        if (!mismoPaciente) {
+            buscadorPacientes.sinBusqueda(() -> {
+                setTipoDocumento(Documento.CEDULA);
+                nombrePaciente.setText("");
+                cedula.setText("");
+            });
+            edadPaciente.setText("");
+            ars.setText("");
+        }
         enzianP.setText("");
         enzianO.setText("");
         enzianO2.setText("");
@@ -718,6 +838,7 @@ public class ReportBuilder extends JFrame {
         postCirugia.setText("");
 
         reporte = new Reporte();
+        reporte.setPacienteId(pacienteConservado); //same patient keeps its UID, new report is still a new row
         imagenesComentarios = new ArrayList<>();
 
     }

@@ -85,7 +85,7 @@ public class SupabaseReportesClient {
      * directly, so a long-running app session doesn't start failing once
      * the access token's ~1 hour lifetime runs out mid-use.
      */
-    private static HttpResponse<String> enviarConReintento(SesionSupabase sesion, Function<String, HttpRequest> construirRequest)
+    static HttpResponse<String> enviarConReintento(SesionSupabase sesion, Function<String, HttpRequest> construirRequest)
             throws IOException, InterruptedException {
 
         HttpRequest request = construirRequest.apply(sesion.accessToken);
@@ -130,11 +130,21 @@ public class SupabaseReportesClient {
         //otherwise it belongs to whoever is actually saving it (the normal case)
         String doctorId = reporte.getDoctorId() != null ? reporte.getDoctorId() : sesion.userId;
         cuerpo.put("doctor_id", doctorId);
+
+        //every report points to a patient by UID: the one picked in the form, or the existing /
+        //newly created patient for the typed document (cedula or passport)
+        String pacienteId = PacientesClient.asegurarPaciente(sesion, reporte);
+        reporte.setPacienteId(pacienteId);
+        if (pacienteId != null) {
+            cuerpo.put("paciente_id", pacienteId);
+        }
         cuerpo.put("estado", estado);
         cuerpo.put("fecha", reporte.getFecha());
         cuerpo.put("nombre", reporte.getNombre());
         cuerpo.put("edad", reporte.getEdad());
-        cuerpo.put("cedula", reporte.getCedula());
+        //stored without dashes (cedula = 11 digits, passport = letters+digits); formatted again when shown
+        cuerpo.put("tipo_documento", reporte.getTipoDocumento());
+        cuerpo.put("cedula", Documento.paraGuardar(reporte.getTipoDocumento(), reporte.getCedula()));
         cuerpo.put("ars", reporte.getArs());
         cuerpo.put("procedimiento", reporte.getProcedimiento());
         cuerpo.put("enzian_p", reporte.getEnzianP());
@@ -166,7 +176,7 @@ public class SupabaseReportesClient {
             actualizarReporte(sesion, id, cuerpo);
         }
 
-        reemplazarImagenes(sesion, id, imagenes);
+        reemplazarImagenes(sesion, id, doctorId, imagenes);
     }
 
     private static String insertarReporte(SesionSupabase sesion, ObjectNode cuerpo) throws IOException, InterruptedException {
@@ -209,14 +219,17 @@ public class SupabaseReportesClient {
      * files first, then re-uploads the current set. Simple and always
      * correct, at the cost of re-uploading unchanged images on every save.
      */
-    private static void reemplazarImagenes(SesionSupabase sesion, String reporteId, List<DialogoImagenes.ImagenComentario> imagenes)
+    private static void reemplazarImagenes(SesionSupabase sesion, String reporteId, String doctorId, List<DialogoImagenes.ImagenComentario> imagenes)
             throws IOException, InterruptedException {
 
         eliminarImagenesExistentes(sesion, reporteId);
 
         int orden = 1;
         for (DialogoImagenes.ImagenComentario ic : imagenes) {
-            String path = sesion.userId + "/" + reporteId + "/" + orden + ".jpg";
+            //stored under the folder of the doctor the report BELONGS to, not whoever happens to be
+            //saving it - the storage policy only lets a doctor read their own folder, so images saved
+            //by an admin under the admin's folder were unreadable to the assigned doctor
+            String path = doctorId + "/" + reporteId + "/" + orden + ".jpg";
             subirImagen(sesion, path, ic.getImagen());
 
             ObjectNode fila = MAPPER.createObjectNode();
@@ -411,10 +424,13 @@ public class SupabaseReportesClient {
         Reporte reporte = new Reporte();
         reporte.setId(fila.get("id").asText());
         reporte.setDoctorId(texto(fila, "doctor_id"));
+        String pacienteIdCargado = texto(fila, "paciente_id");
+        reporte.setPacienteId(pacienteIdCargado.isEmpty() ? null : pacienteIdCargado);
         reporte.setFecha(texto(fila, "fecha"));
         reporte.setNombre(texto(fila, "nombre"));
         reporte.setEdad(texto(fila, "edad"));
         reporte.setCedula(texto(fila, "cedula"));
+        reporte.setTipoDocumento(texto(fila, "tipo_documento"));
         reporte.setArs(texto(fila, "ars"));
         reporte.setProcedimiento(texto(fila, "procedimiento"));
         reporte.setEnzianP(texto(fila, "enzian_p"));

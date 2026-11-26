@@ -89,11 +89,11 @@ public class PdfReportGenerator {
             seccionInfo.add(separador());
             seccionInfo.add(new Paragraph("Nombre: " + safe(reporte.getNombre())).simulateBold().setFontSize(12).setMarginBottom(2));
 
-            Table datos = new Table(UnitValue.createPercentArray(new float[]{1,4,1,4})).useAllAvailableWidth();
+            Table datos = new Table(UnitValue.createPercentArray(new float[]{1.3f,3.7f,1.3f,3.7f})).useAllAvailableWidth();
             datos.addCell(etiquetaCompacta("Edad:").simulateBold());
             datos.addCell(celdaCompacta(safe(reporte.getEdad())));
-            datos.addCell(etiquetaCompacta("Cédula:").simulateBold());
-            datos.addCell(celdaCompacta(safe(reporte.getCedula())));
+            datos.addCell(etiquetaCompacta(Documento.etiqueta(reporte.getTipoDocumento()) + ":").simulateBold());
+            datos.addCell(celdaCompacta(Documento.paraMostrar(reporte.getTipoDocumento(), reporte.getCedula())));
             datos.addCell(etiquetaCompacta("ARS:").simulateBold());
             datos.addCell(celdaCompacta(safe(reporte.getArs())));
             datos.addCell(etiquetaCompacta("Fecha:").simulateBold());

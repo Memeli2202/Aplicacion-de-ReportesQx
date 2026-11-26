@@ -25,7 +25,7 @@ public class DialogoBorradores extends JDialog {
     private final List<SupabaseReportesClient.ResumenBorrador> filasActuales = new ArrayList<>();
     private final List<SupabaseReportesClient.ResumenBorrador> todosLosBorradores;
     private final JTextField campoBusqueda = new JTextField(18);
-    private final JComboBox<String> tipoFiltro = new JComboBox<>(new String[]{"Todos", "Nombre", "Cédula", "Fecha"});
+    private final JComboBox<String> tipoFiltro = new JComboBox<>(new String[]{"Todos", "Nombre", "Documento", "Fecha"});
     private final JTextField campoDesde = new JTextField(10);
     private final JTextField campoHasta = new JTextField(10);
     private final JButton botonLimpiarRango = new JButton("Limpiar rango");
@@ -47,8 +47,8 @@ public class DialogoBorradores extends JDialog {
         this.mostrarColumnaDoctor = nombresPorDoctorId != null && !nombresPorDoctorId.isEmpty();
 
         Object[] columnas = mostrarColumnaDoctor
-                ? new Object[]{"Nombre", "Cédula", "Fecha", "Estado", "Doctor"}
-                : new Object[]{"Nombre", "Cédula", "Fecha", "Estado"};
+                ? new Object[]{"Nombre", "Documento", "Fecha", "Estado", "Doctor"}
+                : new Object[]{"Nombre", "Documento", "Fecha", "Estado"};
 
         modeloTabla = new DefaultTableModel(columnas, 0) {
             @Override
@@ -199,9 +199,9 @@ public class DialogoBorradores extends JDialog {
                 filasActuales.add(b);
                 if (mostrarColumnaDoctor) {
                     String nombreDoctor = nombresPorDoctorId.getOrDefault(b.doctorId, "Desconocido");
-                    modeloTabla.addRow(new Object[]{safe(b.nombre), safe(b.cedula), safe(b.fecha), safe(b.estado), nombreDoctor});
+                    modeloTabla.addRow(new Object[]{safe(b.nombre), Documento.paraMostrar(b.cedula), safe(b.fecha), safe(b.estado), nombreDoctor});
                 } else {
-                    modeloTabla.addRow(new Object[]{safe(b.nombre), safe(b.cedula), safe(b.fecha), safe(b.estado)});
+                    modeloTabla.addRow(new Object[]{safe(b.nombre), Documento.paraMostrar(b.cedula), safe(b.fecha), safe(b.estado)});
                 }
             }
         }
@@ -238,12 +238,18 @@ public class DialogoBorradores extends JDialog {
         }
         return switch (tipo) {
             case "Nombre" -> safe(b.nombre).toLowerCase().contains(texto);
-            case "Cédula" -> safe(b.cedula).toLowerCase().contains(texto);
+            case "Documento" -> coincideDocumento(b, texto);
             case "Fecha" -> safe(b.fecha).toLowerCase().contains(texto);
             default -> safe(b.nombre).toLowerCase().contains(texto)
-                    || safe(b.cedula).toLowerCase().contains(texto)
+                    || coincideDocumento(b, texto)
                     || safe(b.fecha).toLowerCase().contains(texto);
         };
+    }
+
+    //dashes and case don't matter: "001-1234" finds a document stored as 0011234
+    private boolean coincideDocumento(SupabaseReportesClient.ResumenBorrador b, String texto) {
+        String buscado = Documento.sinFormato(texto);
+        return !buscado.isEmpty() && Documento.sinFormato(b.cedula).contains(buscado);
     }
 
     private static String safe(String s) {

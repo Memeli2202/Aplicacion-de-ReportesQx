@@ -1,7 +1,9 @@
 public class Reporte {
 
     private String id;
-    private String doctorId;
+    private String pacienteId;
+    private String tipoDocumento;
+    private String doctorId; //null = defaults to whoever saves it; set explicitly when an admin assigns/reassigns a report
     private String fecha;
     private String nombre;
     private String edad;
@@ -50,6 +52,14 @@ public class Reporte {
         return id;
     }
     public void setId(String id) {this.id = id;}
+
+    //UID of the patient this report belongs to (pacientes.id); null until the report is first saved
+    public String getPacienteId() {return pacienteId;}
+    public void setPacienteId(String pacienteId) {this.pacienteId = pacienteId;}
+
+    //"cedula" or "pasaporte" - decides how the document is typed, printed and labeled
+    public String getTipoDocumento() {return Documento.normalizarTipo(tipoDocumento);}
+    public void setTipoDocumento(String tipoDocumento) {this.tipoDocumento = tipoDocumento;}
 
     public String getDoctorId() {return doctorId;}
     public void setDoctorId(String doctorId) {this.doctorId = doctorId;}
