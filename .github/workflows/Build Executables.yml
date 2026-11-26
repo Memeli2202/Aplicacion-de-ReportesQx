@@ -164,7 +164,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - name: Download all built installers
@@ -172,16 +172,13 @@ jobs:
         with:
           path: installers
 
-      # Releases go to a separate PUBLIC repo that holds only installers, so the code
-      # in this (private) repo is never visible. The app checks that repo for updates.
-      # RELEASES_REPO_TOKEN = fine-grained token with Contents: read and write on that repo only.
-      - name: Publish release to the public releases-only repo
+      # Publishes to THIS repo with the built-in token (no secret needed).
+      # Later, to hide the code: see "Optional later: hide the source code" in GUIA.md.
+      - name: Publish GitHub Release with installers attached
         uses: softprops/action-gh-release@v3
         with:
-          repository: Memeli2202/DoctorHelper-Releases
-          token: ${{ secrets.RELEASES_REPO_TOKEN }}
           tag_name: ${{ github.ref_name }}
           name: Doctor Helper ${{ github.ref_name }}
-          body: "Doctor Helper ${{ github.ref_name }}. Windows: .exe (or .msi). Mac: .dmg for Apple Silicon (M1 and newer) or Intel."
           make_latest: true
           files: installers/*/*
+          generate_release_notes: true
