@@ -41,9 +41,9 @@ public class VersionChecker {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    //Public repo that holds ONLY the installers (no code). The code repo stays private;
-    //the CI workflow publishes each release here. Must be public so this check needs no token.
-    private static final String REPO = "Memeli2202/DoctorHelper-Releases";
+    //Repo whose latest release is checked for updates. Must be public (no token is sent).
+    //If releases move to a separate public "releases-only" repo later, change this line.
+    private static final String REPO = "Memeli2202/Aplicacion-de-ReportesQx";
     private static final String API_URL = "https://api.github.com/repos/" + REPO + "/releases/latest";
 
     private static class Asset {
